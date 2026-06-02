@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="32" fill="#0b0e1a"/>
+  <circle cx="96" cy="80" r="32" fill="#fcd87a" opacity="0.9"/>
+  <ellipse cx="80" cy="72" rx="8" ry="6" fill="#fff" opacity="0.6"/>
+  <circle cx="108" cy="74" r="3" fill="#fff" opacity="0.4"/>
+  <path d="M40 110 Q64 90 96 100 Q128 110 152 95 L160 130 Q120 145 80 138 Q50 130 40 110Z" fill="#4a90d9" opacity="0.3"/>
+  <path d="M52 120 Q80 105 112 112 Q140 118 156 108" fill="none" stroke="#4a90d9" stroke-width="1.5" opacity="0.15"/>
+  <text x="96" y="158" text-anchor="middle" font-size="22" font-weight="700" fill="#eef4f8" font-family="sans-serif">天空</text>
+</svg>

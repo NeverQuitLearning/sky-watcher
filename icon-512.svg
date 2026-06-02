@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#0b0e1a"/>
+  <circle cx="256" cy="200" r="80" fill="#fcd87a" opacity="0.9"/>
+  <ellipse cx="220" cy="185" rx="20" ry="15" fill="#fff" opacity="0.6"/>
+  <circle cx="290" cy="190" r="8" fill="#fff" opacity="0.4"/>
+  <circle cx="240" cy="165" r="4" fill="#fff" opacity="0.5"/>
+  <path d="M100 280 Q170 230 260 255 Q350 280 410 245 L440 340 Q320 380 210 360 Q130 340 100 280Z" fill="#4a90d9" opacity="0.25"/>
+  <path d="M130 300 Q220 270 300 290 Q380 310 420 280" fill="none" stroke="#4a90d9" stroke-width="4" opacity="0.1"/>
+  <text x="256" y="410" text-anchor="middle" font-size="60" font-weight="700" fill="#eef4f8" font-family="sans-serif">天空观测</text>
+</svg>
