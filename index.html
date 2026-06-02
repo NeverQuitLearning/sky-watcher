@@ -892,7 +892,7 @@ function fetchSupplementaryAPIs(now) {
   const i = idx >= 0 ? idx : 0;
   weatherSources.openmeteo = { cloud: state.hourly.cloud_cover[i] };
   if (keys.qweather) {
-    fetchSupplementaryQWeather(keys.qweather).then(r => { if (r) { weatherSources.qweather = r; updateConsensus(); renderScoreFromQW(r); document.getElementById("dataSourceStatus").innerHTML = "📡 当前数据源：<span style=\"color:#6bcb77\">和风天气（准）</span>"; } else { document.getElementById("dataSourceStatus").innerHTML = "📡 当前数据源：<span style=\"color:#ffd93d\">和风天气（无数据）</span>"; } }).catch(() => { document.getElementById("dataSourceStatus").innerHTML = "📡 当前数据源：<span style=\"color:#ff6b6b\">和风天气 API 请求失败</span>"; });
+    fetchSupplementaryQWeather(keys.qweather).then(r => { if (r) { weatherSources.qweather = r; updateConsensus(); renderScoreFromQW(r); } else { updateConsensus(); } updateDataSourceStatus(); }).catch(() => { updateDataSourceStatus(); });
   }
   if (keys.caiyun) {
     fetchSupplementaryCaiyun(keys.caiyun).then(r => { if (r) { weatherSources.caiyun = r; updateConsensus(); } }).catch(() => {});
@@ -2690,10 +2690,21 @@ function updateDataSourceStatus() {
   const el = document.getElementById('dataSourceStatus');
   if (!el) return;
   const keys = getApiKeys();
+  const qw = weatherSources?.qweather;
+  const cy = weatherSources?.caiyun;
   let sources = ['<span style="color:#6bcb77">Open-Meteo（全球）</span>'];
-  if (keys.qweather) sources.push('<span style="color:#4d96ff">和风天气</span>');
-  if (keys.caiyun) sources.push('<span style="color:#a78bfa">彩云天气</span>');
-  el.innerHTML = '📡 当前数据源：' + sources.join(' + ') + ' · <span style="font-size:.65rem;color:rgba(255,255,255,.25)">多源共识取最优</span>';
+  if (keys.qweather) {
+    const qwStatus = qw ? '<span style="color:#6bcb77;font-size:.65rem">✅已接入</span>' : '<span style="color:#ffd93d;font-size:.65rem">⏳等待中</span>';
+    sources.push('<span style="color:#4d96ff">和风天气</span>' + qwStatus);
+  }
+  if (keys.caiyun) {
+    const cyStatus = cy ? '<span style="color:#6bcb77;font-size:.65rem">✅已接入</span>' : '<span style="color:#ffd93d;font-size:.65rem">⏳等待中</span>';
+    sources.push('<span style="color:#a78bfa">彩云天气</span>' + cyStatus);
+  }
+  if (!keys.qweather && !keys.caiyun) {
+    sources.push('<span style="color:rgba(255,255,255,.3);font-size:.65rem">建议配置和风天气获取更准数据</span>');
+  }
+  el.innerHTML = '📡 数据源：' + sources.join(' + ');
 }
 
 // ====================================================================
