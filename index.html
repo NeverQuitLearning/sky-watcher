@@ -620,6 +620,7 @@ async function detectLocation() {
     { url:'https://ip-api.com/json/?fields=city,lat,lon', parse: d => d.lat ? {lat:d.lat,lng:d.lon,city:d.city||''} : null },
     { url:'https://ipapi.co/json/', parse: d => d.latitude ? {lat:d.latitude,lng:d.longitude,city:d.city||d.region||''} : null, timeout: 3000 },
     { url:'https://ipinfo.io/json', parse: d => d.loc ? (()=>{const [lat,lng]=d.loc.split(',');return {lat:+lat,lng:+lng,city:d.city||d.region||''}})() : null, timeout: 3000 },
+    { url:'https://ipwho.is/?fields=latitude,longitude,city', parse: d => d.latitude ? {lat:d.latitude,lng:d.longitude,city:d.city||''} : null, timeout: 3000 },
   ];
   for (const svc of ipServices) {
     try {
@@ -892,7 +893,7 @@ function fetchSupplementaryAPIs(now) {
   const i = idx >= 0 ? idx : 0;
   weatherSources.openmeteo = { cloud: state.hourly.cloud_cover[i] };
   if (keys.qweather) {
-    fetchSupplementaryQWeather(keys.qweather).then(r => { if (r) { weatherSources.qweather = r; updateConsensus(); renderScoreFromQW(r); } else { updateConsensus(); } updateDataSourceStatus(); }).catch(() => { updateDataSourceStatus(); });
+    fetchSupplementaryQWeather(keys.qweather).then(r => { if (r && r.error) { weatherSources.qweatherError = r.error; } else if (r) { weatherSources.qweather = r; } updateConsensus(); if (r && !r.error) { renderScoreFromQW(r); } updateDataSourceStatus(); }).catch(() => { updateDataSourceStatus(); });
   }
   if (keys.caiyun) {
     fetchSupplementaryCaiyun(keys.caiyun).then(r => { if (r) { weatherSources.caiyun = r; updateConsensus(); } }).catch(() => {});
@@ -924,7 +925,13 @@ async function fetchSupplementaryQWeather(key) {
       fetch(`https://devapi.qweather.com/v7/weather/3d?location=${lng},${lat}&key=${key}`),
       fetch(`https://devapi.qweather.com/v7/weather/24h?location=${lng},${lat}&key=${key}`)
     ]);
-    if (!dailyResp.ok || !hourlyResp.ok) return null;
+    if (!dailyResp.ok || !hourlyResp.ok) {
+      const dStatus = dailyResp.status;
+      const hStatus = hourlyResp.status;
+      if (dStatus === 403 || hStatus === 403) return { error: '🔥 和风天气 API 拒绝访问（403），请确认：\n1. 已订阅免费 Web API 计划\n2. Key 状态为启用\n3. 前往 console.qweather.com 检查' };
+      if (dStatus === 401 || hStatus === 401) return { error: '和风天气 Key 无效（401），请检查 Key 是否正确' };
+      return { error: `和风天气 HTTP ${dStatus}/${hStatus}` };
+    }
     const dailyData = await dailyResp.json();
     const hourlyData = await hourlyResp.json();
     if (dailyData.code !== '200' || hourlyData.code !== '200') return null;
@@ -2691,10 +2698,14 @@ function updateDataSourceStatus() {
   if (!el) return;
   const keys = getApiKeys();
   const qw = weatherSources?.qweather;
+  const qwErr = weatherSources?.qweatherError;
   const cy = weatherSources?.caiyun;
   let sources = ['<span style="color:#6bcb77">Open-Meteo（全球）</span>'];
   if (keys.qweather) {
-    const qwStatus = qw ? '<span style="color:#6bcb77;font-size:.65rem">✅已接入</span>' : '<span style="color:#ffd93d;font-size:.65rem">⏳等待中</span>';
+    let qwStatus;
+    if (qwErr) qwStatus = `<span style="color:#ff6b6b;font-size:.65rem">❌${qwErr.slice(0,20)}</span>`;
+    else if (qw) qwStatus = '<span style="color:#6bcb77;font-size:.65rem">✅已接入</span>';
+    else qwStatus = '<span style="color:#ffd93d;font-size:.65rem">⏳等待中</span>';
     sources.push('<span style="color:#4d96ff">和风天气</span>' + qwStatus);
   }
   if (keys.caiyun) {
@@ -2705,6 +2716,18 @@ function updateDataSourceStatus() {
     sources.push('<span style="color:rgba(255,255,255,.3);font-size:.65rem">建议配置和风天气获取更准数据</span>');
   }
   el.innerHTML = '📡 数据源：' + sources.join(' + ');
+  
+  // Also show QWeather error in alerts if present
+  if (qwErr) {
+    const alertsEl = document.getElementById('alerts');
+    if (alertsEl && !alertsEl.querySelector('.qweather-error')) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'qweather-error';
+      errDiv.style.margin = '4px 0';
+      errDiv.innerHTML = '<div class="alert-banner" style="background:rgba(255,68,68,.1);border-color:rgba(255,68,68,.25)"><span class="alert-icon">⚠️</span><span class="alert-text" style="font-size:.72rem;white-space:pre-wrap">' + qwErr + '</span></div>';
+      alertsEl.prepend(errDiv);
+    }
+  }
 }
 
 // ====================================================================
