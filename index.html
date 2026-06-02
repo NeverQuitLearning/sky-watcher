@@ -760,22 +760,79 @@ async function searchCity() {
 }
 
 // ====================================================================
+//  LOCALSTORAGE CACHE (for faster repeat loads)
+// ====================================================================
+const CACHE_KEY = 'skywatcher_weather_v1';
+const CACHE_GEO_KEY = 'skywatcher_geo_v1';
+const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+
+function getWeatherCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw);
+    if (Date.now() - cached.ts > CACHE_TTL) { localStorage.removeItem(CACHE_KEY); return null; }
+    return cached;
+  } catch(e) { return null; }
+}
+function setWeatherCache(data) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data, lat: state.lat.toFixed(4), lng: state.lng.toFixed(4) }));
+  } catch(e) { /* quota exceeded, ignore */ }
+}
+function getGeoCache(key) {
+  try {
+    const raw = localStorage.getItem(CACHE_GEO_KEY);
+    if (!raw) return null;
+    const cache = JSON.parse(raw);
+    const entry = cache[key];
+    if (!entry) return null;
+    if (Date.now() - entry.ts > 7 * 24 * 60 * 60 * 1000) { delete cache[key]; localStorage.setItem(CACHE_GEO_KEY, JSON.stringify(cache)); return null; }
+    return entry.data;
+  } catch(e) { return null; }
+}
+function setGeoCache(key, data) {
+  try {
+    const raw = localStorage.getItem(CACHE_GEO_KEY);
+    const cache = raw ? JSON.parse(raw) : {};
+    cache[key] = { ts: Date.now(), data };
+    localStorage.setItem(CACHE_GEO_KEY, JSON.stringify(cache));
+  } catch(e) { /* ignore */ }
+}
+
+// ====================================================================
 //  WEATHER
 // ====================================================================
 async function loadWeather() {
   if (state.lat == null) return;
+  const now = new Date();
+
+  // Try cache first for instant render (matches lat/lng)
+  const cached = getWeatherCache();
+  if (cached && cached.data && cached.lat === state.lat.toFixed(4) && cached.lng === state.lng.toFixed(4)) {
+    state.data = cached.data;
+    state.hourly = cached.data.hourly;
+    state.daily = cached.data.daily;
+    state.sun = sunTimes(state.lat, state.lng);
+    renderAll();
+    const age = Math.round((Date.now() - cached.ts) / 60000);
+    document.getElementById('refreshCountdown').textContent = `📦 ${age}分钟前 · 后台刷新中…`;
+    refreshWeatherInBackground();
+    return;
+  }
+
+  // No cache — full load with spinner
   showLoading();
+  await fetchWeatherAndRender(now);
+}
 
+async function fetchWeatherAndRender(now) {
   try {
-    const now = new Date();
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    const url = `https://api.open-meteo.com/v1/forecast?` +
-      `latitude=${state.lat}&longitude=${state.lng}` +
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${state.lat}&longitude=${state.lng}` +
       `&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code` +
       `&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,cloud_cover,visibility,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,uv_index` +
       `&timezone=${encodeURIComponent(tz)}&forecast_days=8`;
-
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
@@ -783,51 +840,62 @@ async function loadWeather() {
     state.data = data;
     state.hourly = data.hourly;
     state.daily = data.daily;
-
-    // Calculate sun times (use our own for consistency)
     state.sun = sunTimes(state.lat, state.lng);
 
-    // Primary render uses Open-Meteo data
+    // Cache it
+    setWeatherCache(data);
+
     renderAll();
-
-    // === Supplementary multi-source fetching for consensus ===
-    weatherSources = {};
-    const keys = getApiKeys();
-
-    // Open-Meteo is always available as primary source
-    const hIdx = now.getHours();
-    const idx = state.hourly.time.findIndex(t => new Date(t).getHours() >= hIdx);
-    const i = idx >= 0 ? idx : 0;
-    weatherSources.openmeteo = {
-      cloud: state.hourly.cloud_cover[i],
-    };
-
-    // Fetch from QWeather (supplementary)
-    if (keys.qweather) {
-      fetchSupplementaryQWeather(keys.qweather).then(result => {
-        if (result) {
-          weatherSources.qweather = result;
-          updateConsensus();
-        }
-      }).catch(() => {});
-    }
-
-    // Fetch from Caiyun (supplementary)
-    if (keys.caiyun) {
-      fetchSupplementaryCaiyun(keys.caiyun).then(result => {
-        if (result) {
-          weatherSources.caiyun = result;
-          updateConsensus();
-        }
-      }).catch(() => {});
-    }
-
+    fetchSupplementaryAPIs(now);
     updateRefreshUI();
   } catch(e) {
-    // Fallback: render with sun calc only (no weather)
+    // Fallback
     state.sun = sunTimes(state.lat, state.lng);
-    renderAllNoWeather();
+    if (state.hourly) {
+      renderAll();
+    } else {
+      renderAllNoWeather();
+    }
     updateRefreshUI();
+  }
+}
+
+async function refreshWeatherInBackground() {
+  // Silent refresh in background
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const url = `https://api.open-meteo.com/v1/forecast?` +
+      `latitude=${state.lat}&longitude=${state.lng}` +
+      `&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weather_code` +
+      `&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,cloud_cover,visibility,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_direction_10m,uv_index` +
+      `&timezone=${encodeURIComponent(tz)}&forecast_days=8`;
+    const resp = await fetch(url);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    state.data = data;
+    state.hourly = data.hourly;
+    state.daily = data.daily;
+    state.sun = sunTimes(state.lat, state.lng);
+    setWeatherCache(data);
+    renderAll();
+    const now = new Date();
+    fetchSupplementaryAPIs(now);
+    updateRefreshUI();
+  } catch(e) { /* background refresh failed, cached data remains */ }
+}
+
+function fetchSupplementaryAPIs(now) {
+  weatherSources = {};
+  const keys = getApiKeys();
+  const hIdx = now.getHours();
+  const idx = state.hourly.time.findIndex(t => new Date(t).getHours() >= hIdx);
+  const i = idx >= 0 ? idx : 0;
+  weatherSources.openmeteo = { cloud: state.hourly.cloud_cover[i] };
+  if (keys.qweather) {
+    fetchSupplementaryQWeather(keys.qweather).then(r => { if (r) { weatherSources.qweather = r; updateConsensus(); } }).catch(() => {});
+  }
+  if (keys.caiyun) {
+    fetchSupplementaryCaiyun(keys.caiyun).then(r => { if (r) { weatherSources.caiyun = r; updateConsensus(); } }).catch(() => {});
   }
 }
 
