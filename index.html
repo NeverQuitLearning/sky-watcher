@@ -1148,8 +1148,50 @@ function renderScore() {
     <div class="meter" style="margin-top:4px">
       <div class="meter-fill" style="width:${total}%;background:${color};height:4px;border-radius:8px"></div>
     </div>
-    <div id="scoreConsensus"></div>`;
+    <div id="scoreConsensus"></div>
+
+    <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="font-size:.68rem;color:rgba(255,255,255,.5);margin-bottom:4px">🌅 今晚日落晚霞预报（${formatTime(state.sun.sunset)}）</div>` +
+      sunsetFireCloudHTML() +
+    `</div>`;
   updateConsensus();
+}
+
+function sunsetFireCloudHTML() {
+  const sunsetH = state.sun?.sunset;
+  if (sunsetH == null) return '<div class="error-msg">暂无日落数据</div>';
+  const todayPrefix = state.daily?.time?.[0]?.substring(0,10);
+  if (!todayPrefix) return '<div class="error-msg">暂无预报数据</div>';
+  // Find sunset hour in hourly data
+  let sunsetIdx = -1;
+  for (let h = 0; h < state.hourly.time.length; h++) {
+    const ht = state.hourly.time[h];
+    if (ht.startsWith(todayPrefix)) {
+      const hh = new Date(ht).getHours() + new Date(ht).getMinutes()/60;
+      if (Math.abs(hh - sunsetH) < 1) { sunsetIdx = h; break; }
+    }
+  }
+  if (sunsetIdx < 0) return '<div style="font-size:.62rem;color:rgba(255,255,255,.25)">日落时段数据尚未生成</div>';
+  const cloud = state.hourly.cloud_cover[sunsetIdx] ?? 50;
+  const hum = state.hourly.relative_humidity_2m[sunsetIdx] ?? 50;
+  const vis = state.hourly.visibility[sunsetIdx] ?? 10000;
+  const p = state.hourly.precipitation_probability[sunsetIdx] ?? 0;
+  let cf = cloud>=20&&cloud<=60 ? 1-Math.abs(cloud-40)/35 : cloud<20 ? (cloud/20)*0.4 : Math.max(0,1-(cloud-60)/45);
+  let hf = hum>=35&&hum<=70 ? 1-Math.abs(hum-52)/30 : hum<35 ? (hum/35)*0.5 : Math.max(0,1-(hum-70)/30);
+  const vf = Math.min(1, Math.max(0, (vis-3000)/15000));
+  const pp = p > 50 ? (p-50)/50*0.5 : 0;
+  const score = Math.round(Math.min(100, Math.max(0, (cf*0.45+hf*0.25+vf*0.15)*100*(1-pp))));
+  const level = score >= 70 ? '🔥' : score >= 50 ? '✨' : score >= 25 ? '🌤' : '☁️';
+  const color = score >= 70 ? '#ff6b35' : score >= 50 ? '#ffa94d' : score >= 25 ? '#ffd93d' : 'rgba(255,255,255,.3)';
+  const tierLabel = score >= 70 ? '强' : score >= 50 ? '中' : score >= 25 ? '弱' : '无';
+  const cloudPct = `${cloud}%`;
+  const humPct = `${hum}%`;
+  const visKm = (vis/1000).toFixed(1);
+  return `<div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:1.2rem">${level}</span>
+      <span style="font-size:1rem;font-weight:700;color:${color}">${score}<span style="font-size:.65rem;font-weight:400;color:${color};opacity:.7">/${tierLabel}</span></span>
+      <span style="font-size:.62rem;color:rgba(255,255,255,.4)">☁️${cloudPct} 💧${humPct} 👁${visKm}km</span>
+    </div>`;
 }
 
 // ---------- Timeline ----------
