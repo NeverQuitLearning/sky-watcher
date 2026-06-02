@@ -417,7 +417,12 @@ header button:hover{background:rgba(255,200,80,.2);border-color:rgba(255,200,80,
       <input type="text" id="qweatherKeyInput" placeholder="输入你的和风天气 API Key…" style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 12px;color:#fff;font-size:.78rem;outline:none">
       <button id="saveQweatherKeyBtn" style="background:rgba(77,150,255,.15);border:1px solid rgba(77,150,255,.25);border-radius:8px;padding:8px 14px;color:#4d96ff;cursor:pointer;font-size:.75rem;white-space:nowrap">保存</button>
     </div>
-    <div style="font-size:.65rem;color:rgba(255,255,255,.25);margin-top:6px">免费注册 dev.qweather.com 获取国内更精准的预报</div>
+    <div style="font-size:.68rem;color:rgba(255,255,255,.4);margin-top:6px">和风天气 API Host（在控制台→设置中查看）</div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="qweatherHostInput" placeholder="你的专属host，如 abcxyz.qweatherapi.com" style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 12px;color:#fff;font-size:.75rem;outline:none">
+      <button id="saveQweatherHostBtn" style="background:rgba(77,150,255,.1);border:1px solid rgba(77,150,255,.2);border-radius:8px;padding:8px 14px;color:#4d96ff;cursor:pointer;font-size:.7rem;white-space:nowrap">保存</button>
+    </div>
+    <div style="font-size:.65rem;color:rgba(255,255,255,.25);margin-top:6px">免费注册 console.qweather.com 获取国内更精准的预报</div>
     <div id="qweatherSaveFeedback" style="font-size:.7rem;margin-top:6px;display:none"></div>
     <div style="font-size:.75rem;color:rgba(255,255,255,.5);margin-top:12px;margin-bottom:6px">彩云天气 (Caiyun) API Key <span style="font-size:.65rem;color:rgba(255,255,255,.3)">(免费注册: dashboard.caiyunapp.com)</span></div>
     <div style="display:flex;gap:8px">
@@ -594,6 +599,7 @@ let weatherSources = {};
 function getApiKeys() {
   return {
     qweather: localStorage.getItem('qweather_key'),
+    qweatherHost: localStorage.getItem('qweather_host'),
     caiyun: localStorage.getItem('caiyun_key')
   };
 }
@@ -893,7 +899,7 @@ function fetchSupplementaryAPIs(now) {
   const i = idx >= 0 ? idx : 0;
   weatherSources.openmeteo = { cloud: state.hourly.cloud_cover[i] };
   if (keys.qweather) {
-    fetchSupplementaryQWeather(keys.qweather).then(r => { if (r && r.error) { weatherSources.qweatherError = r.error; } else if (r) { weatherSources.qweather = r; } updateConsensus(); if (r && !r.error) { renderScoreFromQW(r); } updateDataSourceStatus(); }).catch(() => { updateDataSourceStatus(); });
+    fetchSupplementaryQWeather(keys.qweather, keys.qweatherHost).then(r => { if (r && r.error) { weatherSources.qweatherError = r.error; } else if (r) { weatherSources.qweather = r; } updateConsensus(); if (r && !r.error) { renderScoreFromQW(r); } updateDataSourceStatus(); }).catch(() => { updateDataSourceStatus(); });
   }
   if (keys.caiyun) {
     fetchSupplementaryCaiyun(keys.caiyun).then(r => { if (r) { weatherSources.caiyun = r; updateConsensus(); } }).catch(() => {});
@@ -918,12 +924,13 @@ function showError(msg) {
 //  SUPPLEMENTARY WEATHER FETCHING (for consensus)
 // ====================================================================
 
-async function fetchSupplementaryQWeather(key) {
+async function fetchSupplementaryQWeather(key, host) {
   try {
     const lng = state.lng, lat = state.lat;
+    const baseUrl = host ? `https://${host}` : 'https://devapi.qweather.com';
     const [dailyResp, hourlyResp] = await Promise.all([
-      fetch(`https://devapi.qweather.com/v7/weather/3d?location=${lng},${lat}&key=${key}`),
-      fetch(`https://devapi.qweather.com/v7/weather/24h?location=${lng},${lat}&key=${key}`)
+      fetch(`${baseUrl}/v7/weather/3d?location=${lng},${lat}&key=${key}`),
+      fetch(`${baseUrl}/v7/weather/24h?location=${lng},${lat}&key=${key}`)
     ]);
     if (!dailyResp.ok || !hourlyResp.ok) {
       const dStatus = dailyResp.status;
@@ -2644,6 +2651,9 @@ function toggleSettingsPanel() {
   if (keys.qweather) {
     document.getElementById('qweatherKeyInput').value = keys.qweather;
   }
+  if (keys.qweatherHost) {
+    document.getElementById('qweatherHostInput').value = keys.qweatherHost;
+  }
   if (keys.caiyun) {
     document.getElementById('caiyunKeyInput').value = keys.caiyun;
   }
@@ -2674,6 +2684,23 @@ document.getElementById('saveQweatherKeyBtn').addEventListener('click', function
     updateDataSourceStatus();
   }
 });
+
+document.getElementById('saveQweatherHostBtn').addEventListener('click', function() {
+  const host = document.getElementById('qweatherHostInput').value.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (host) {
+    localStorage.setItem('qweather_host', host);
+    showFeedback('qweatherSaveFeedback', '✅ API Host 已保存！刷新后生效', '#6bcb77');
+  } else {
+    localStorage.removeItem('qweather_host');
+    showFeedback('qweatherSaveFeedback', '已清除 API Host，将使用默认地址', 'rgba(255,255,255,.5)');
+  }
+  updateDataSourceStatus();
+});
+
+function showFeedback(id, msg, color) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = msg; el.style.display = 'block'; el.style.color = color; }
+}
 
 document.getElementById('saveCaiyunKeyBtn').addEventListener('click', function() {
   const key = document.getElementById('caiyunKeyInput').value.trim();
@@ -2706,7 +2733,8 @@ function updateDataSourceStatus() {
     if (qwErr) qwStatus = `<span style="color:#ff6b6b;font-size:.65rem">❌${qwErr.slice(0,20)}</span>`;
     else if (qw) qwStatus = '<span style="color:#6bcb77;font-size:.65rem">✅已接入</span>';
     else qwStatus = '<span style="color:#ffd93d;font-size:.65rem">⏳等待中</span>';
-    sources.push('<span style="color:#4d96ff">和风天气</span>' + qwStatus);
+    const hostLabel = keys.qweatherHost ? `<span style="font-size:.5rem;color:rgba(255,255,255,.25)">[${keys.qweatherHost.slice(0,20)}…]</span>` : '';
+    sources.push('<span style="color:#4d96ff">和风天气</span>' + qwStatus + hostLabel);
   }
   if (keys.caiyun) {
     const cyStatus = cy ? '<span style="color:#6bcb77;font-size:.65rem">✅已接入</span>' : '<span style="color:#ffd93d;font-size:.65rem">⏳等待中</span>';
