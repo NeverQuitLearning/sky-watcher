@@ -899,7 +899,13 @@ function fetchSupplementaryAPIs(now) {
   const i = idx >= 0 ? idx : 0;
   weatherSources.openmeteo = { cloud: state.hourly.cloud_cover[i] };
   if (keys.qweather) {
-    fetchSupplementaryQWeather(keys.qweather, keys.qweatherHost).then(r => { if (r && r.error) { weatherSources.qweatherError = r.error; } else if (r) { weatherSources.qweather = r; } updateConsensus(); if (r && !r.error) { renderScoreFromQW(r); } updateDataSourceStatus(); }).catch(() => { updateDataSourceStatus(); });
+    fetchSupplementaryQWeather(keys.qweather, keys.qweatherHost).then(r => {
+      if (r && r.error) { weatherSources.qweatherError = r.error; }
+      else if (r) { weatherSources.qweather = r; }
+      if (r && !r.error) { try { renderScoreFromQW(r); } catch(e) { console.warn('QW render error:', e); } }
+      updateConsensus();
+      updateDataSourceStatus();
+    }).catch(() => { updateDataSourceStatus(); });
   }
   if (keys.caiyun) {
     fetchSupplementaryCaiyun(keys.caiyun).then(r => { if (r) { weatherSources.caiyun = r; updateConsensus(); } }).catch(() => {});
