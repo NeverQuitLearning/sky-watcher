@@ -1,7 +1,7 @@
 const CACHE = 'sky-watcher-v1';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll([
-    '/sky-watcher.html',
+    '/',
     '/manifest.json',
     '/icon-192.svg',
     '/icon-512.svg'
@@ -14,3 +14,4 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(r => r || fetch(e.request).catch(() => new Response('', {status: 200})))
   );
 });
+
