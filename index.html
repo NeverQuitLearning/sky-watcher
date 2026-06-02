@@ -2650,6 +2650,17 @@ function toggleSettingsPanel() {
   const keys = getApiKeys();
   if (keys.qweather) {
     document.getElementById('qweatherKeyInput').value = keys.qweather;
+    // Auto-set host for known keys
+    if (!keys.qweatherHost) {
+      const keyPrefix = keys.qweather.substring(0, 8);
+      const knownHosts = {
+        '73dd4fea': 'km4d94uf9f.re.qweatherapi.com',
+      };
+      if (knownHosts[keyPrefix]) {
+        localStorage.setItem('qweather_host', knownHosts[keyPrefix]);
+        keys.qweatherHost = knownHosts[keyPrefix];
+      }
+    }
   }
   if (keys.qweatherHost) {
     document.getElementById('qweatherHostInput').value = keys.qweatherHost;
@@ -2671,6 +2682,13 @@ document.getElementById('saveQweatherKeyBtn').addEventListener('click', function
   if (key) {
     localStorage.setItem('qweather_api_key', key);
     setApiKey('qweather_key', key);
+    // Auto-set API Host if known for this key
+    const knownHosts = { '73dd4fea': 'km4d94uf9f.re.qweatherapi.com' };
+    const keyPrefix = key.substring(0, 8);
+    if (knownHosts[keyPrefix] && !localStorage.getItem('qweather_host')) {
+      localStorage.setItem('qweather_host', knownHosts[keyPrefix]);
+      document.getElementById('qweatherHostInput').value = knownHosts[keyPrefix];
+    }
     feedback.textContent = '✅ API Key 已保存！刷新后作为共识参考源。';
     feedback.style.display = 'block';
     feedback.style.color = '#6bcb77';
