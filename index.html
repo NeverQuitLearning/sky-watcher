@@ -892,7 +892,7 @@ function fetchSupplementaryAPIs(now) {
   const i = idx >= 0 ? idx : 0;
   weatherSources.openmeteo = { cloud: state.hourly.cloud_cover[i] };
   if (keys.qweather) {
-    fetchSupplementaryQWeather(keys.qweather).then(r => { if (r) { weatherSources.qweather = r; updateConsensus(); } }).catch(() => {});
+    fetchSupplementaryQWeather(keys.qweather).then(r => { if (r) { weatherSources.qweather = r; updateConsensus(); renderScoreFromQW(r); } }).catch(() => {});
   }
   if (keys.caiyun) {
     fetchSupplementaryCaiyun(keys.caiyun).then(r => { if (r) { weatherSources.caiyun = r; updateConsensus(); } }).catch(() => {});
@@ -941,6 +941,7 @@ async function fetchSupplementaryQWeather(key) {
 
     const todayDaily = dailyData.daily[0] || {};
 
+    const warnings = dailyData.warning || [];
     return {
       cloud: parseInt(curHourly.cloud) || 50,
       humidity: parseInt(curHourly.humidity) || 50,
@@ -952,6 +953,7 @@ async function fetchSupplementaryQWeather(key) {
       tempMin: parseFloat(todayDaily.tempMin) || 15,
       sunRise: todayDaily.sunrise || '',
       sunSet: todayDaily.sunset || '',
+      warnings: warnings,
     };
   } catch(e) {
     return null;
@@ -1070,6 +1072,85 @@ function renderAll() {
   try { renderForecast(); } catch(e) { console.warn('renderForecast error:',e); }
   renderAlerts();
   applyHighlights();
+}
+
+// When QWeather data arrives, re-render score card with Chinese data
+function renderScoreFromQW(qw) {
+  if (!qw || !state.sun) return;
+  const cloud = qw.cloud ?? 50;
+  const humidity = qw.humidity ?? 50;
+  const vis = (qw.visibility ?? 10) * 1000;
+  const precip = qw.precipProb ?? 0;
+  
+  const phase = getCurrentSkyPhase(state.sun);
+  const isGolden = phase === 'golden-hour' || phase === 'sunset' || phase === 'twilight';
+  let cloudScore;
+  if (isGolden) {
+    cloudScore = cloud < 15 ? 40 : cloud < 35 ? 60 : cloud < 55 ? 100 : cloud < 70 ? 80 : cloud < 85 ? 50 : 20;
+  } else {
+    cloudScore = cloud < 10 ? 100 : cloud < 25 ? 90 : cloud < 40 ? 70 : cloud < 60 ? 50 : cloud < 80 ? 30 : 10;
+  }
+  const humScore = humidity < 40 ? 100 : humidity < 55 ? 85 : humidity < 70 ? 65 : humidity < 85 ? 40 : 15;
+  const visScore = vis > 20000 ? 100 : vis > 10000 ? 80 : vis > 5000 ? 50 : vis > 2000 ? 25 : 5;
+  const precipScore = precip < 10 ? 100 : precip < 30 ? 70 : precip < 50 ? 40 : precip < 70 ? 20 : 5;
+  const total = Math.round((cloudScore * 0.35 + humScore * 0.2 + visScore * 0.25 + precipScore * 0.2));
+  
+  let color, label, badgeClass;
+  if (total >= 80) { color = '#6bcb77'; label = '极佳'; } else if (total >= 65) { color = '#4d96ff'; label = '良好'; } else if (total >= 45) { color = '#ffd93d'; label = '一般'; } else { color = '#ff6b6b'; label = '较差'; }
+  const circumference = 2 * Math.PI * 35;
+  const offset = circumference * (1 - total / 100);
+  const cloudLabel = cloud < 10 ? '晴' : cloud < 30 ? '少云' : cloud < 50 ? '多云' : cloud < 70 ? '阴' : '阴';
+  const visLabel = vis > 15000 ? '极好' : vis > 8000 ? '好' : vis > 4000 ? '一般' : vis > 2000 ? '较差' : '差';
+  
+  const el = document.getElementById('scoreContent');
+  if (!el) return;
+  
+  el.innerHTML = `
+    <div class="score-ring">
+      <div style="position:relative">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="35" class="bg-ring"/>
+          <circle cx="40" cy="40" r="35" class="fg-ring" stroke="${color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/>
+        </svg>
+        <div class="score-value" style="top:50%;left:50%;transform:translate(-50%,-50%)">
+          <span class="num">${total}</span>
+          <span class="lbl">${label}</span>
+        </div>
+      </div>
+      <div class="score-details">
+        <div class="item"><span class="lbl">☁️ 云量</span><span class="val">${cloud}% · ${cloudLabel}</span></div>
+        <div class="item"><span class="lbl">💧 湿度</span><span class="val">${humidity}%</span></div>
+        <div class="item"><span class="lbl">👁 能见度</span><span class="val">${(vis/1000).toFixed(1)}km · ${visLabel}</span></div>
+        <div class="item"><span class="lbl">🌧 降雨</span><span class="val">${precip}%</span></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;font-size:.62rem;color:rgba(255,255,255,.3);padding:2px 0;justify-content:space-between">
+      <span>🌡 ${qw.temp ?? '--'}°C</span>
+      <span style="color:#4d96ff">📡 和风天气</span>
+    </div>
+    <div class="meter" style="margin-top:4px">
+      <div class="meter-fill" style="width:${total}%;background:${color};height:4px;border-radius:8px"></div>
+    </div>
+    <div id="scoreConsensus"></div>`;
+  
+  // Show warnings if any
+  if (qw.warnings && qw.warnings.length > 0) {
+    const alertsEl = document.getElementById('alerts');
+    if (alertsEl) {
+      const warnHtml = qw.warnings.map(w => {
+        const isRed = w.level === '红色' || w.level === 'red';
+        const levelColor = isRed ? '#ff4444' : w.level === '橙色' ? '#ff8c00' : w.level === '黄色' ? '#ffd93d' : '#4d96ff';
+        return `<div class="alert-banner alert-glow" style="background:rgba(255,${isRed?68:200},80,.1);border-color:${levelColor}40">
+          <span class="alert-icon" style="color:${levelColor}">⚠️</span>
+          <span class="alert-text"><strong style="color:${levelColor}">${w.title || '气象预警'}</strong> · ${w.text || ''}</span>
+        </div>`;
+      }).join('');
+      // Prepend warnings
+      alertsEl.innerHTML = warnHtml + alertsEl.innerHTML;
+    }
+  }
+  
+  updateConsensus();
 }
 
 function renderAllNoWeather() {
