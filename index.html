@@ -2119,14 +2119,14 @@ function renderSpots() {
       isLocal: true,
     }));
     } else {
-    // 无城市专属列表 → 尝试搜索附近
+    // 无城市专属列表 -> 尝试搜索附近
     tryNearbySearch();
-    document.getElementById(\'spotsContent\').innerHTML = \'<div style=\"text-align:center;padding:12px\">\' +
-      \'<div style=\"font-size:.82rem;color:rgba(255,255,255,.4);margin-bottom:6px\">📍 \' + (cityName || \'当前区域\') + \' 暂无专属拍摄点</div>\' +
-      \'<div style=\"font-size:.72rem;color:rgba(255,255,255,.25);line-height:1.6;margin-bottom:8px\">试试搜索 <strong>北京</strong>、<strong>上海</strong>、<strong>广州</strong>、<strong>深圳</strong>、<strong>杭州</strong>、<strong>成都</strong> 查看经典机位<br>或点下方按钮搜索附近</div>\' +
-      \'</div>\' +
-      \'<div style=\"text-align:center\"><button id=\"searchNearbyBtn\" onclick=\"searchNearbySpots()\" style=\"background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 12px;color:rgba(255,255,255,.5);cursor:pointer;font-size:.7rem\">🔍 搜索附近适合拍摄的点</button></div>\' +
-      \'<div id=\"nearbyResults\"></div>\';
+    document.getElementById('spotsContent').innerHTML = '<div style=\"text-align:center;padding:12px\">' +
+      '<div style=\"font-size:.82rem;color:rgba(255,255,255,.4);margin-bottom:6px\">\u{1F4CD} ' + (cityName || '\u5F53\u524D\u533A\u57DF') + ' \u6682\u65E0\u4E13\u5C5E\u62CD\u6444\u70B9</div>' +
+      '<div style=\"font-size:.72rem;color:rgba(255,255,255,.25);line-height:1.6;margin-bottom:8px\">\u8BD5\u8BD5\u641C\u7D22 <strong>\u5317\u4EAC</strong>、<strong>\u4E0A\u6D77</strong>、<strong>\u5E7F\u5DDE</strong>、<strong>\u6DF1\u5733</strong>、<strong>\u676D\u5DDE</strong>、<strong>\u6210\u90FD</strong> \u67E5\u770B\u7ECF\u5178\u673A\u4F4D<br>\u6216\u70B9\u4E0B\u65B9\u6309\u94AE\u641C\u7D22\u9644\u8FD1</div>' +
+      '</div>' +
+      '<div style=\"text-align:center\"><button id=\"searchNearbyBtn\" onclick=\"searchNearbySpots()\" style=\"background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 12px;color:rgba(255,255,255,.5);cursor:pointer;font-size:.7rem\">\uD83D\uDD0D \u641C\u7D22\u9644\u8FD1\u9002\u5408\u62CD\u6444\u7684\u70B9</button></div>' +
+      '<div id=\"nearbyResults\"></div>';
     return;
   }
 
