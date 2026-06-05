@@ -971,9 +971,9 @@ async function fetchSupplementaryQWeather(key, host) {
 async function fetchSupplementaryCaiyun(key) {
   try {
     const lng = state.lng, lat = state.lat;
-    // v2.6 综合接口（支持CORS，推荐使用）
-    const url = `https://api.caiyunapp.com/v2.6/${key}/${lng},${lat}/weather?alert=false&hourlysteps=24`;
-    const resp = await fetch(url);
+    // 通过 Cloudflare Pages Function 代理（绕过 CORS 限制）
+    const path = `/v2.6/${key}/${lng},${lat}/weather?alert=false&hourlysteps=24`;
+    const resp = await fetch(`/caiyun-proxy?path=${encodeURIComponent(path)}`);
     if (!resp.ok) return null;
     const data = await resp.json();
     if (data.status !== 'ok') return null;
