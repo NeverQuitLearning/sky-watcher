@@ -2061,7 +2061,7 @@ function renderNearbyResults(spots, sort) {
       '</div>' +
       '<div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px;margin-top:2px">' +
         '<span style="font-size:.58rem;background:' + lc + '20;color:' + lc + ';padding:1px 6px;border-radius:4px;font-weight:600">' + level + '</span>' +
-        (s.lat && s.lng ? '<a href="https://uri.amap.com/navigation?to=' + s.lng + ',' + s.lat + ',' + encodeURIComponent(s.name) + '&mode=car&coordinate=gaode" target="_blank" rel="noopener" style="font-size:.5rem;color:#4d96ff;text-decoration:none;background:rgba(77,150,255,.1);border-radius:4px;padding:1px 5px">🗺️导航</a>' : '') +
+        (s.lat && s.lng ? '<a href="https://uri.amap.com/navigation?to=' + s.lng + ',' + s.lat + ',' + encodeURIComponent(s.name+' '+s.desc) + '&mode=car&coordinate=gaode" target="_blank" rel="noopener" style="font-size:.5rem;color:#4d96ff;text-decoration:none;background:rgba(77,150,255,.1);border-radius:4px;padding:1px 5px">🗺️导航</a>' : '') +
       '</div></div>';
   });
   if (spots.length > 15) html += '<div style="text-align:center;font-size:.6rem;color:rgba(255,255,255,.2);padding:4px 0">还有' + (spots.length-15) + '个地点…</div>';
@@ -2188,7 +2188,7 @@ function spotCardHtml(s) {
   const searchQ = encodeURIComponent(`北京 ${s.name} 日落 摄影`);
   const feeIcon = s.fee && s.fee.includes('免费') ? '🆓' : '🎫';
   const hoursStr = s.hours ? `🕐 ${s.hours}` : '';
-  const navUrl = `https://uri.amap.com/navigation?to=${s.lng},${s.lat},${encodeURIComponent(s.name)}&mode=car&coordinate=gaode`;
+  const navUrl = `https://uri.amap.com/navigation?to=${s.lng},${s.lat},${encodeURIComponent(s.name+' '+s.desc)}&mode=car&coordinate=gaode`;
   return `<div style="background:rgba(255,255,255,.04);border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:all .2s" onclick="toggleSpotDetail(this)" ontouchstart="">
     <div style="font-size:.72rem;font-weight:600;margin-bottom:2px">${s.name} <span style="font-weight:400;color:rgba(255,200,80,.6);font-size:.6rem">${s.tag||''}</span></div>
     <div style="font-size:.62rem;color:rgba(255,255,255,.5);margin-bottom:3px">${s.desc}</div>
