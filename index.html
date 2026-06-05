@@ -2135,7 +2135,7 @@ function renderSpots() {
 
   // 渲染每个机位卡片
   if (filteredSpots.length > 0) {
-    const showSpots = filteredSpots.slice(0, 8); // 最多8个
+    const showSpots = filteredSpots; // 显示全部近距离机位
     spotsHtml += '<div class="photo-guide-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">';
     showSpots.forEach(s => {
       const distLabel = s.distance < 1 ? `${Math.round(s.distance*1000)}m` : `${s.distance.toFixed(1)}km`;
