@@ -2197,9 +2197,8 @@ function spotCardHtml(s, searchCity) {
   // 百度搜图：按机位类型加朝霞/晚霞关键词，搜到的是实拍氛围图而非普通风景
   const typeLabel = s.type === 'sunrise' ? '朝霞 日出' : s.type === 'sunset' ? '晚霞 日落 火烧云' : '朝霞 晚霞';
   const bingQ = encodeURIComponent(`${city} ${s.name} ${typeLabel}`);
-  // 小红书：用"机位"更精准，搜到的是摄影攻略
-  const xhsType = s.type === 'sunrise' ? '日出 朝霞 机位' : s.type === 'sunset' ? '日落 晚霞 机位' : '摄影 机位';
-  const xhsQ = encodeURIComponent(`${city} ${s.name} ${xhsType}`);
+  // 小红书：直接搜"景点名 机位"，摄影圈最常用tag
+  const xhsQ = encodeURIComponent(`${s.name} 机位`);
   const feeIcon = s.fee && s.fee.includes('免费') ? '🆓' : '🎫';
   const hoursStr = s.hours ? `🕐 ${s.hours}` : '';
   // 高德网页版链接（电脑直接跳、手机做回退）
