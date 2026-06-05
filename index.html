@@ -554,13 +554,30 @@ async function reverseGeocode(lat, lng) {
     const d = Math.abs(_revGeoCache.lat - lat) + Math.abs(_revGeoCache.lng - lng);
     if (d < 0.01) return _revGeoCache.address;
   }
-  // 用 Overpass API 查最近的区/街道/地标名
+  // 优先用高德逆地理编码（如果用户配置了高德Key）
+  const keys = getApiKeys();
+  if (keys.amap) {
+    try {
+      const resp = await fetch(`https://restapi.amap.com/v3/geocode/regeo?location=${lng},${lat}&key=${keys.amap}&radius=200&extensions=all`, { signal: AbortSignal.timeout(5000) });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.status === '1' && data.regeocode) {
+          const fmt = data.regeocode.formatted_address || '';
+          const aoi = data.regeocode.aois?.[0]?.name || '';
+          const neis = data.regeocode.neighborhood?.name || '';
+          const brief = aoi || neis || fmt.split('路')[0] + '路' || fmt.substring(0, 30);
+          if (brief && brief.length > 2) {
+            _revGeoCache = { lat, lng, address: brief, time: Date.now() };
+            return brief;
+          }
+        }
+      }
+    } catch(e) { /* fall through */ }
+  }
+  // 备用：用 Overpass API 查最近的区/街道/地标名
   const queries = [
-    // 查街道/区/镇
     `[out:json][timeout:5];node(around:200,${lat},${lng})["place"~"suburb|neighbourhood|town|village"];out 1;`,
-    // 如果没街道，查附近有名的地标/公园
     `[out:json][timeout:5];node(around:300,${lat},${lng})["tourism"~"attraction|viewpoint"];out 1;`,
-    // 再不行，查路名
     `[out:json][timeout:5];way(around:100,${lat},${lng})["highway"~"primary|secondary|tertiary"];out center 1;`,
   ];
   for (const q of queries) {
@@ -575,12 +592,7 @@ async function reverseGeocode(lat, lng) {
         const el = data.elements[0];
         const name = el.tags?.name || el.tags?.zh_name || '';
         if (name) {
-          // 找上位区域名（区/市）
-          let area = '';
-          if (el.tags?.place === 'suburb' || el.tags?.place === 'neighbourhood') {
-            area = ''; // 街道名本身就够了
-          }
-          const addr = area ? area + ' · ' + name : name;
+          const addr = name;
           _revGeoCache = { lat, lng, address: addr, time: Date.now() };
           return addr;
         }
@@ -1911,20 +1923,74 @@ function calcDirection(lat1, lng1, lat2, lng2) {
 // ====================================================================
 let _nearbyResults = null;
 
-async function searchNearbySpots() {
+// 自动尝试搜索附近（当无城市专属列表时调用，仅在有AMap Key时自动触发）
+let _autoSearched = false;
+async function tryNearbySearch() {
+  if (_autoSearched) return;
+  const keys = getApiKeys();
+  // 只有配置了高德Key才自动搜（快），Overpass太慢不自动触发
+  if (!keys.amap) return;
+  _autoSearched = true;
+  // 延迟一下等页面渲染完
+  setTimeout(() => searchNearbySpots(true), 800);
+}
+
+async function searchNearbySpots(auto) {
   const sort = document.getElementById('nearbySort')?.value || 'distance';
   const btn = document.getElementById('searchNearbyBtn');
-  const container = document.getElementById('nearbyResults');
+  const container = auto ? document.getElementById('spotsContent') : document.getElementById('nearbyResults');
   if (!container) return;
   if (btn) { btn.textContent = '🔍 搜索中…'; btn.disabled = true; btn.style.opacity = '.5'; }
-  container.innerHTML = '<div style="padding:12px;text-align:center;font-size:.72rem;color:rgba(255,255,255,.3)"><div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0 auto 6px"></div>搜索附近适合拍天空的地点…</div>';
+  if (auto) {
+    container.innerHTML = '<div style="text-align:center;padding:8px;font-size:.72rem;color:rgba(255,255,255,.25)">搜索附近适合拍摄的地点…</div>';
+  } else {
+    container.innerHTML = '<div style="padding:12px;text-align:center;font-size:.72rem;color:rgba(255,255,255,.3)"><div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0 auto 6px"></div>搜索附近适合拍天空的地点…</div>';
+  }
 
   try {
     const lat = state.lat, lng = state.lng;
     if (!lat || !lng) { container.innerHTML = '<div style="padding:8px;text-align:center;font-size:.7rem;color:rgba(255,255,255,.25)">请先定位</div>'; if(btn){btn.textContent='🔍 搜索附近';btn.disabled=false;btn.style.opacity='1'} return; }
 
     const radius = state.city ? 10000 : 6000;
-    const q = `[out:json][timeout:15];(
+    
+    // 优先使用高德POI搜索（如果有Key且不是自动模式）
+    const keys = getApiKeys();
+    if (keys.amap && !auto) {
+      try {
+        const types = '公园|风景名胜|文物古迹|城市广场|体育休闲服务|自然地物';
+        const resp = await fetch(`https://restapi.amap.com/v3/place/around?key=${keys.amap}&location=${lng},${lat}&radius=${radius}&types=${encodeURIComponent(types)}&offset=25&extensions=all`, { signal: AbortSignal.timeout(6000) });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === '1' && data.pois && data.pois.length > 0) {
+            const spots = [];
+            const seen = new Set();
+            (data.pois || []).forEach(poi => {
+              const name = poi.name || '';
+              if (!name || seen.has(name)) return; seen.add(name);
+              const [plng, plat] = (poi.location || '').split(',').map(Number);
+              if (!plat || !plng) return;
+              const type = poi.type || '';
+              let tag, desc, ptype, tip;
+              if (type.includes('公园')) { tag='🌳'; desc='公园'; ptype='sunset'; tip='开阔草坪，朝西方向拍日落无遮挡'; }
+              else if (type.includes('风景名胜') || type.includes('文物古迹')) { tag='🏛'; desc='景点'; ptype='both'; tip='标志性建筑+天空同框，经典构图'; }
+              else if (type.includes('广场')) { tag='🏛'; desc='广场'; ptype='both'; tip='开阔广场，日出日落皆可拍摄'; }
+              else if (type.includes('自然地物')) { tag='⛰'; desc='自然景观'; ptype='both'; tip='开阔自然景观，视野极佳'; }
+              else if (type.includes('体育')) { tag='⚽'; desc='运动场地'; ptype='sunset'; tip='场地开阔，适合日落+天际线'; }
+              else { tag='📍'; desc='地点'; ptype='sunset'; tip='视野开阔适合观景'; }
+              spots.push({ name, desc, tag, ptype, tip, dist: calcDistance(lat,lng,plat,plng), dir: calcDirection(lat,lng,plat,plng) });
+            });
+            if (spots.length > 0) {
+              spots.sort((a,b) => a.dist - b.dist);
+              _nearbyResults = spots;
+              renderNearbyResults(spots, sort);
+              if(btn){btn.textContent='🔍 搜索附近';btn.disabled=false;btn.style.opacity='1'}
+              return;
+            }
+          }
+        }
+      } catch(e) { /* fall through to Overpass */ }
+    }
+const q = `[out:json][timeout:15];(
   node["leisure"="park"](around:${radius},${lat},${lng});
   way["leisure"="park"](around:${radius},${lat},${lng});
   node["tourism"="viewpoint"](around:${radius},${lat},${lng});
@@ -2052,18 +2118,25 @@ function renderSpots() {
       direction: calcDirection(lat, lng, s.lat, s.lng),
       isLocal: true,
     }));
-  } else {
-    document.getElementById('spotsContent').innerHTML = '<div style="text-align:center;padding:12px">' +
-      '<div style="font-size:.82rem;color:rgba(255,255,255,.4);margin-bottom:6px">📍 当前区域暂无专属拍摄点</div>' +
-      '<div style="font-size:.72rem;color:rgba(255,255,255,.25);line-height:1.6;margin-bottom:8px">试试搜索 <strong>北京</strong>、<strong>上海</strong>、<strong>广州</strong>、<strong>深圳</strong>、<strong>杭州</strong>、<strong>成都</strong> 查看经典机位<br>或点下方按钮搜索附近</div>' +
-      '</div>' +
-      '<div style="text-align:center"><button id="searchNearbyBtn" onclick="searchNearbySpots()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 12px;color:rgba(255,255,255,.5);cursor:pointer;font-size:.7rem">🔍 搜索附近适合拍摄的点</button></div>' +
-      '<div id="nearbyResults"></div>';
+    } else {
+    // 无城市专属列表 → 尝试搜索附近
+    tryNearbySearch();
+    document.getElementById(\'spotsContent\').innerHTML = \'<div style=\"text-align:center;padding:12px\">\' +
+      \'<div style=\"font-size:.82rem;color:rgba(255,255,255,.4);margin-bottom:6px\">📍 \' + (cityName || \'当前区域\') + \' 暂无专属拍摄点</div>\' +
+      \'<div style=\"font-size:.72rem;color:rgba(255,255,255,.25);line-height:1.6;margin-bottom:8px\">试试搜索 <strong>北京</strong>、<strong>上海</strong>、<strong>广州</strong>、<strong>深圳</strong>、<strong>杭州</strong>、<strong>成都</strong> 查看经典机位<br>或点下方按钮搜索附近</div>\' +
+      \'</div>\' +
+      \'<div style=\"text-align:center\"><button id=\"searchNearbyBtn\" onclick=\"searchNearbySpots()\" style=\"background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:5px 12px;color:rgba(255,255,255,.5);cursor:pointer;font-size:.7rem\">🔍 搜索附近适合拍摄的点</button></div>\' +
+      \'<div id=\"nearbyResults\"></div>\';
     return;
   }
 
   // 按距离排序
   spots.sort((a, b) => a.distance - b.distance);
+
+  // 只显示合理距离内的机位（城市内15km以内）
+  const MAX_DIST_KM = 15;
+  const nearSpots = spots.filter(s => s.distance <= MAX_DIST_KM);
+  const farSpots = spots.filter(s => s.distance > MAX_DIST_KM);
 
   // 火烧云/日落时段筛选
   const now = new Date();
@@ -2072,58 +2145,35 @@ function renderSpots() {
   const isEvening = sun && h >= sun.goldenHourEvening - 1 && h < sun.sunset + 1;
   const isMorning = sun && h >= sun.sunrise - 1 && h < sun.goldenHourMorning + 1;
 
-  let filteredSpots = spots;
-  if (isEvening) filteredSpots = spots.filter(s => s.type === 'sunset' || s.type === 'both');
-  else if (isMorning) filteredSpots = spots.filter(s => s.type === 'sunrise' || s.type === 'both');
+  // 筛选：先用距离筛（15km内），再按时段
+  let filteredSpots = nearSpots;
+  if (isEvening) filteredSpots = nearSpots.filter(s => s.type === 'sunset' || s.type === 'both');
+  else if (isMorning) filteredSpots = nearSpots.filter(s => s.type === 'sunrise' || s.type === 'both');
 
   // 排序：距离近的在前
   const cityShowName = cityName || (cityId ? cityId.charAt(0).toUpperCase() + cityId.slice(1) : '');
 
   let html = '';
+  const displayCount = filteredSpots.length;
+  const totalCount = nearSpots.length;
   html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
-    '<div style="font-size:.8rem;color:rgba(255,255,255,.4)">📍 ' + (cityShowName || '附近') + ' · ' + spots.length + '个推荐机位</div>' +
+    '<div style="font-size:.8rem;color:rgba(255,255,255,.4)">📍 ' + (cityShowName || '附近') + ' · ' + displayCount + '个推荐机位' +
+    (farSpots.length > 0 ? ' <span style="font-size:.55rem;color:rgba(255,255,255,.2)">(还有' + farSpots.length + '个较远)</span>' : '') +
+    '</div>' +
     '<div style="display:flex;gap:4px;align-items:center">' +
       '<button class="spot-filter" data-filter="all" style="background:rgba(255,200,80,.15);border:none;border-radius:6px;padding:3px 8px;color:#fcd87a;font-size:.6rem;cursor:pointer">全部</button>' +
       '<button class="spot-filter" data-filter="sunset" style="background:rgba(255,255,255,.06);border:none;border-radius:6px;padding:3px 8px;color:rgba(255,255,255,.4);font-size:.6rem;cursor:pointer">🌇</button>' +
       '<button class="spot-filter" data-filter="sunrise" style="background:rgba(255,255,255,.06);border:none;border-radius:6px;padding:3px 8px;color:rgba(255,255,255,.4);font-size:.6rem;cursor:pointer">🌅</button>' +
     '</div></div>';
 
-  // 当前时段智能推荐
-  let idealSpots = filteredSpots;
-
-  idealSpots.forEach((s, i) => {
-    const badgeColor = s.tag === '经典机位' ? '#ffd93d' : s.tag === '高空机位' ? '#4d96ff' : s.tag === '水面倒影' ? '#6bcb77' : '#a78bfa';
-    const distStr = s.distance < 1 ? (s.distance*1000).toFixed(0)+'m' : s.distance.toFixed(1)+'km';
-    const timeIcon = s.type === 'both' ? '🌅🌇' : s.type === 'sunset' ? '🌇' : '🌅';
-
-    html += '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:' + (i < idealSpots.length-1 ? '1px solid rgba(255,255,255,.04)' : 'none') + '">' +
-      '<div style="flex-shrink:0;width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;font-size:1.2rem">📸</div>' +
-      '<div style="flex:1;min-width:0">' +
-        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
-          '<span style="font-size:.88rem;font-weight:600">' + s.name + '</span>' +
-          '<span style="background:' + badgeColor + '20;color:' + badgeColor + ';padding:1px 6px;border-radius:4px;font-size:.58rem;font-weight:600">' + s.tag + '</span>' +
-        '</div>' +
-        '<div style="font-size:.72rem;color:rgba(255,255,255,.5);margin-top:2px">' + s.desc + '</div>' +
-        '<div style="font-size:.68rem;color:rgba(255,255,255,.3);margin-top:4px;display:flex;gap:12px">' +
-          '<span>' + distStr + ' · ' + s.direction + '</span>' +
-          '<span>' + timeIcon + '</span>' +
-        '</div>' +
-        '<div style="font-size:.7rem;color:rgba(255,255,255,.35);margin-top:4px;line-height:1.4">💡 ' + s.detail + '</div>' +
-      '</div>' +
-    '</div>';
-  });
-
-  // 如果条件不佳但有邻近的好机位，加提示
-  if (filteredSpots.length > 0) {
-    const hasGreat = filteredSpots.some(s => s.distance < 5);
-    if (hasGreat) {
-      html += '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,200,80,.06);border-radius:8px;font-size:.72rem;color:rgba(255,255,255,.4);text-align:center;line-height:1.5">';
-      html += '📌 以上推荐的机位距你较近，天气好时带上相机去看看吧！';
-      html += '</div>';
-    }
+  if (filteredSpots.length === 0) {
+    html += '<div style="text-align:center;padding:16px;font-size:.72rem;color:rgba(255,255,255,.25);line-height:1.6">';
+    html += '📍 附近15km内没有适合当前时段的机位<br><span style="font-size:.62rem">试试查看全部机位或搜索附近</span>';
+    html += '</div>';
   }
 
-  document.getElementById('spotsContent').innerHTML = html;
+  // 当前时段智能推荐
+  let idealSpots = filteredSpots;
 
 
 
