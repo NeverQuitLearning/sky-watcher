@@ -431,6 +431,13 @@ header button:hover{background:rgba(255,200,80,.2);border-color:rgba(255,200,80,
     </div>
     <div style="font-size:.65rem;color:rgba(255,255,255,.25);margin-top:6px">免费注册 dashboard.caiyunapp.com 获取超精细预报（逐分钟级）</div>
     <div id="caiyunSaveFeedback" style="font-size:.7rem;margin-top:6px;display:none"></div>
+    <div style="font-size:.75rem;color:rgba(255,255,255,.5);margin-top:12px;margin-bottom:6px">高德地图 API Key <span style="font-size:.65rem;color:rgba(255,255,255,.3)">(lbs.amap.com Web服务)</span></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="amapKeyInput" placeholder="输入高德 Web服务 API Key…" style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 12px;color:#fff;font-size:.78rem;outline:none">
+      <button id="saveAmapKeyBtn" style="background:rgba(77,150,255,.15);border:1px solid rgba(77,150,255,.25);border-radius:8px;padding:8px 14px;color:#4d96ff;cursor:pointer;font-size:.75rem;white-space:nowrap">保存</button>
+    </div>
+    <div style="font-size:.65rem;color:rgba(255,255,255,.25);margin-top:6px">免费申请，用于精确到街道的逆地理编码定位</div>
+    <div id="amapSaveFeedback" style="font-size:.7rem;margin-top:6px;display:none"></div>
   </div>
   <div class="dash-footer" style="text-align:center;font-size:.55rem;color:rgba(255,255,255,.15);padding:2px 0 4px">
     Open-Meteo · SunCalc · 仅供参考 🌤
@@ -600,7 +607,8 @@ function getApiKeys() {
   return {
     qweather: localStorage.getItem('qweather_key'),
     qweatherHost: localStorage.getItem('qweather_host'),
-    caiyun: localStorage.getItem('caiyun_key')
+    caiyun: localStorage.getItem('caiyun_key'),
+    amap: localStorage.getItem('amap_key')
   };
 }
 
@@ -2674,6 +2682,9 @@ function toggleSettingsPanel() {
   if (keys.caiyun) {
     document.getElementById('caiyunKeyInput').value = keys.caiyun;
   }
+  if (keys.amap) {
+    document.getElementById('amapKeyInput').value = keys.amap;
+  }
 
   updateDataSourceStatus();
 }
@@ -2744,6 +2755,24 @@ document.getElementById('saveCaiyunKeyBtn').addEventListener('click', function()
   }
 });
 
+document.getElementById('saveAmapKeyBtn').addEventListener('click', function() {
+  const key = document.getElementById('amapKeyInput').value.trim();
+  const feedback = document.getElementById('amapSaveFeedback');
+  if (key) {
+    localStorage.setItem('amap_key', key);
+    feedback.textContent = '✅ 高德 Key 已保存！定位将精确到街道。';
+    feedback.style.display = 'block';
+    feedback.style.color = '#6bcb77';
+    updateDataSourceStatus();
+  } else {
+    localStorage.removeItem('amap_key');
+    feedback.textContent = '已清除高德 Key，将使用 Nominatim 定位。';
+    feedback.style.display = 'block';
+    feedback.style.color = 'rgba(255,255,255,.5)';
+    updateDataSourceStatus();
+  }
+});
+
 function updateDataSourceStatus() {
   const el = document.getElementById('dataSourceStatus');
   if (!el) return;
@@ -2763,6 +2792,9 @@ function updateDataSourceStatus() {
   if (keys.caiyun) {
     const cyStatus = cy ? '<span style="color:#6bcb77;font-size:.65rem">✅已接入</span>' : '<span style="color:#ffd93d;font-size:.65rem">⏳等待中</span>';
     sources.push('<span style="color:#a78bfa">彩云天气</span>' + cyStatus);
+  }
+  if (keys.amap) {
+    sources.push('<span style="color:#ff6b35">高德(定位)</span>');
   }
   if (!keys.qweather && !keys.caiyun) {
     sources.push('<span style="color:rgba(255,255,255,.3);font-size:.65rem">建议配置和风天气获取更准数据</span>');
