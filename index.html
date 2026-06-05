@@ -640,34 +640,13 @@ async function detectLocation() {
     return;
   }
 
-  // 先尝试IP定位作为快速初始方案（多个备用源）
-  let ipFallback = null;
-  const ipServices = [
-    { url:'https://ip-api.com/json/?fields=city,lat,lon', parse: d => d.lat ? {lat:d.lat,lng:d.lon,city:d.city||''} : null },
-    { url:'https://ipapi.co/json/', parse: d => d.latitude ? {lat:d.latitude,lng:d.longitude,city:d.city||d.region||''} : null, timeout: 3000 },
-    { url:'https://ipinfo.io/json', parse: d => d.loc ? (()=>{const [lat,lng]=d.loc.split(',');return {lat:+lat,lng:+lng,city:d.city||d.region||''}})() : null, timeout: 3000 },
-    { url:'https://ipwho.is/?fields=latitude,longitude,city', parse: d => d.latitude ? {lat:d.latitude,lng:d.longitude,city:d.city||''} : null, timeout: 3000 },
-  ];
-  for (const svc of ipServices) {
-    try {
-      const ctrl = svc.timeout ? new AbortController() : undefined;
-      const tid = ctrl ? setTimeout(() => ctrl.abort(), svc.timeout) : null;
-      const resp = await fetch(svc.url, ctrl ? { signal: ctrl.signal } : {});
-      if (tid) clearTimeout(tid);
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      const parsed = svc.parse(data);
-      if (parsed) { ipFallback = parsed; break; }
-    } catch(e) { /* try next */ }
-  }
-
   try {
     const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, {
       enableHighAccuracy: false, timeout: 8000, maximumAge: 60000
     }));
     state.lat = pos.coords.latitude;
     state.lng = pos.coords.longitude;
-    state.city = ipFallback?.city || '';
+    state.city = '';
     const acc = pos.coords.accuracy ? ` ±${Math.round(pos.coords.accuracy)}m` : '';
     document.getElementById('locationDisplay').textContent = `📍 定位中… (${acc})`;
     document.getElementById('cityInput').value = '';
@@ -695,21 +674,10 @@ async function detectLocation() {
                    e.code === 2 ? '⚠️ 无法获取位置（信号弱）' :
                    e.code === 3 ? '⏱ 定位超时' : '⚠️ 定位失败';
 
-    // 优先用IP定位兜底
-    if (ipFallback) {
-      state.lat = ipFallback.lat; state.lng = ipFallback.lng; state.city = ipFallback.city;
-      document.getElementById('locationDisplay').textContent = `📍 ${ipFallback.city || 'IP定位'} · ${state.lat.toFixed(2)}, ${state.lng.toFixed(2)} (IP近似)`;
-      document.getElementById('cityInput').value = ipFallback.city || '';
-      // 显示提示条告知用户权限问题
-      showPermissionTip(e.code === 1);
-      await loadWeather();
-      return;
-    }
-
-    // IP也失败 → 根据时区猜城市 + 快速选择
+    // GPS失败 → 根据时区猜城市 + 快速选择
     const tzGuess = guessCityFromTZ();
     document.getElementById('locationDisplay').textContent = '📍 定位失败，请搜索城市';
-    showError(errMsg + '，IP定位也失败');
+    showError(errMsg + '，请搜索城市或点击下方快速定位');
     if (e.code === 1) showPermissionTip(true);
 
     // 显示快速选择按钮
@@ -1003,36 +971,26 @@ async function fetchSupplementaryQWeather(key, host) {
 async function fetchSupplementaryCaiyun(key) {
   try {
     const lng = state.lng, lat = state.lat;
-    const url = `https://api.caiyunapp.com/v2.5/${key}/${lng},${lat}/hourly`;
+    // v2.6 综合接口（支持CORS，推荐使用）
+    const url = `https://api.caiyunapp.com/v2.6/${key}/${lng},${lat}/weather?alert=false&hourlysteps=24`;
     const resp = await fetch(url);
     if (!resp.ok) return null;
     const data = await resp.json();
     if (data.status !== 'ok') return null;
 
-    const now = new Date();
-    const h = now.getHours();
-    const nowISO = now.toISOString().slice(0, 13) + ':00'; // current hour ISO
-
-    function findCurrent(arr) {
-      if (!arr || arr.length === 0) return null;
-      // Find matching hour
-      let match = arr.find(item => item.datetime && item.datetime.startsWith(nowISO.slice(0, 13)));
-      if (!match) match = arr[0];
-      return match;
-    }
-
-    const precip = findCurrent(data.result.hourly?.precipitation);
-    const temp = findCurrent(data.result.hourly?.temperature);
-    const cloudrate = findCurrent(data.result.hourly?.cloudrate);
-    const humidity = findCurrent(data.result.hourly?.humidity);
-    const visibility = findCurrent(data.result.hourly?.visibility);
+    // v2.6 result.realtime 包含当前实况数据
+    const rt = data.result?.realtime;
+    if (!rt) return null;
 
     return {
-      cloud: cloudrate ? Math.round(cloudrate.value * 100) : 50,
-      humidity: humidity ? Math.round(humidity.value * 100) : 50,
-      visibility: visibility ? visibility.value : 10,
-      precipProb: precip ? Math.round(precip.probability * 100) : 0,
-      temp: temp ? temp.value : 20,
+      cloud: rt.cloudrate != null ? Math.round(rt.cloudrate * 100) : 50,
+      humidity: rt.humidity != null ? Math.round(rt.humidity * 100) : 50,
+      visibility: rt.visibility != null ? rt.visibility : 10,
+      precipProb: rt.precipitation?.nearest?.probability != null
+        ? Math.round(rt.precipitation.nearest.probability * 100)
+        : (rt.precipitation?.local?.probability != null
+          ? Math.round(rt.precipitation.local.probability * 100) : 0),
+      temp: rt.temperature != null ? rt.temperature : 20,
     };
   } catch(e) {
     return null;
