@@ -1948,7 +1948,7 @@ async function searchNearbySpots(auto) {
               else if (type.includes('自然地物')) { tag='⛰'; desc='自然景观'; ptype='both'; tip='开阔自然景观，视野极佳'; }
               else if (type.includes('体育')) { tag='⚽'; desc='运动场地'; ptype='sunset'; tip='场地开阔，适合日落+天际线'; }
               else { tag='📍'; desc='地点'; ptype='sunset'; tip='视野开阔适合观景'; }
-              spots.push({ name, desc, tag, ptype, tip, dist: calcDistance(lat,lng,plat,plng), dir: calcDirection(lat,lng,plat,plng) });
+              spots.push({ name, desc, tag, ptype, tip, dist: calcDistance(lat,lng,plat,plng), dir: calcDirection(lat,lng,plat,plng), lat: plat, lng: plng });
             });
             if (spots.length > 0) {
               spots.sort((a,b) => a.dist - b.dist);
@@ -2006,7 +2006,7 @@ const q = `[out:json][timeout:15];(
       else if (tg?.natural === 'water' || tg?.water) { tag = '💧'; desc = '水面'; ptype = 'both'; tip = '水面倒影增色，日出日落均可拍'; }
       else if (tg?.leisure === 'pitch') { tag = '⚽'; desc = '运动场'; ptype = 'sunset'; tip = '场地开阔，适合日落+城市天际线'; }
       else if (tg?.leisure === 'garden') { tag = '🌸'; desc = '花园'; ptype = 'sunset'; tip = '园林景观+天空，适合慢门拍摄'; }
-      spots.push({ name, desc, tag, ptype, tip, dist: calcDistance(lat,lng,clat,clng), dir: calcDirection(lat,lng,clat,clng) });
+      spots.push({ name, desc, tag, ptype, tip, dist: calcDistance(lat,lng,clat,clng), dir: calcDirection(lat,lng,clat,clng), lat: clat, lng: clng });
     });
 
     if (spots.length === 0) {
@@ -2059,8 +2059,9 @@ function renderNearbyResults(spots, sort) {
           ' <span style="color:rgba(255,200,80,.5)">' + timeIcon + '</span>' +
         '</div>' +
       '</div>' +
-      '<div style="text-align:right;flex-shrink:0;margin-top:2px">' +
+      '<div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px;margin-top:2px">' +
         '<span style="font-size:.58rem;background:' + lc + '20;color:' + lc + ';padding:1px 6px;border-radius:4px;font-weight:600">' + level + '</span>' +
+        (s.lat && s.lng ? '<a href="https://uri.amap.com/navigation?to=' + s.lng + ',' + s.lat + ',' + encodeURIComponent(s.name) + '&mode=car&coordinate=gaode" target="_blank" rel="noopener" style="font-size:.5rem;color:#4d96ff;text-decoration:none;background:rgba(77,150,255,.1);border-radius:4px;padding:1px 5px">🗺️导航</a>' : '') +
       '</div></div>';
   });
   if (spots.length > 15) html += '<div style="text-align:center;font-size:.6rem;color:rgba(255,255,255,.2);padding:4px 0">还有' + (spots.length-15) + '个地点…</div>';
@@ -2187,10 +2188,14 @@ function spotCardHtml(s) {
   const searchQ = encodeURIComponent(`北京 ${s.name} 日落 摄影`);
   const feeIcon = s.fee && s.fee.includes('免费') ? '🆓' : '🎫';
   const hoursStr = s.hours ? `🕐 ${s.hours}` : '';
+  const navUrl = `https://uri.amap.com/navigation?to=${s.lng},${s.lat},${encodeURIComponent(s.name)}&mode=car&coordinate=gaode`;
   return `<div style="background:rgba(255,255,255,.04);border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:all .2s" onclick="toggleSpotDetail(this)" ontouchstart="">
     <div style="font-size:.72rem;font-weight:600;margin-bottom:2px">${s.name} <span style="font-weight:400;color:rgba(255,200,80,.6);font-size:.6rem">${s.tag||''}</span></div>
     <div style="font-size:.62rem;color:rgba(255,255,255,.5);margin-bottom:3px">${s.desc}</div>
-    <div style="font-size:.55rem;color:rgba(255,255,255,.3)">${s.direction} · ${distLabel} · ${typeIcon}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:.55rem;color:rgba(255,255,255,.3)">${s.direction} · ${distLabel} · ${typeIcon}</div>
+      <a href="${navUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="background:rgba(77,150,255,.15);border:1px solid rgba(77,150,255,.25);border-radius:6px;padding:2px 8px;color:#4d96ff;font-size:.55rem;text-decoration:none;display:inline-flex;align-items:center;gap:2px">🗺️ 导航</a>
+    </div>
     <div class="spot-detail" style="display:none;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:.6rem;color:rgba(255,255,255,.5);line-height:1.6">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
         <span style="background:rgba(255,255,255,.05);border-radius:4px;padding:2px 6px">${feeIcon} ${s.fee||'--'}</span>
