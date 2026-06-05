@@ -1774,31 +1774,31 @@ function renderFireCloud() {
 
 const PHOTO_SPOTS = {
   'beijing': [
-    { name:'景山公园', desc:'俯瞰故宫+日落西山', lat:39.9235,lng:116.3972, type:'sunset',tag:'经典机位',detail:'万春亭朝西拍，故宫中轴线+远山日落，火烧云绝配' },
-    { name:'颐和园', desc:'昆明湖+西山日落', lat:39.9999,lng:116.2755, type:'sunset',tag:'水面倒影',detail:'十七孔桥朝西，西山+昆明湖+晚霞倒影，金光穿洞奇观' },
-    { name:'北海公园', desc:'白塔+日落', lat:39.9243,lng:116.3897, type:'sunset',tag:'经典机位',detail:'白塔+琼岛+晚霞，经典北京名片构图' },
-    { name:'奥森仰山', desc:'城中高点俯拍', lat:40.0170,lng:116.3935, type:'sunset',tag:'全景',detail:'仰山山顶朝西，奥林匹克塔+西山+鸟巢全景日落' },
-    { name:'鬼笑石', desc:'北京城夜景全景', lat:39.9708,lng:116.1955, type:'sunset',tag:'夜景圣地',detail:'西山俯瞰全城日落→蓝调→夜景，火烧云+万家灯火连拍' },
-    { name:'国贸CBD', desc:'天际线日落', lat:39.9087,lng:116.4606, type:'sunset',tag:'城市天际线',detail:'国贸三期/中央电视台周边，CBD摩天楼+晚霞剪影' },
-    { name:'什刹海后海', desc:'水面+胡同日落', lat:39.9416,lng:116.3849, type:'sunset',tag:'胡同风情',detail:'银锭桥向西拍，水面倒影+柳树剪影+西山落日经典' },
-    { name:'中央电视塔', desc:'高空360°全景', lat:39.9160,lng:116.3067, type:'both',tag:'高空机位',detail:'238m高空观景台，朝西落日晚霞+朝东CBD夜景' },
-    { name:'雁栖湖', desc:'远山湖水+日落', lat:40.3686,lng:116.6758, type:'sunset',tag:'远郊秘境',detail:'雁栖塔+APEC建筑群+水面+远山日落，构图层次丰富' },
-    { name:'卢沟桥-永定河', desc:'古桥+水面日落', lat:39.8600,lng:116.2150, type:'sunset',tag:'古桥韵味',detail:'卢沟桥狮子剪影+永定河倒影+落日入河' },
-    { name:'天安门广场', desc:'国旗+城楼日出', lat:39.9054,lng:116.3976, type:'sunrise',tag:'经典日出',detail:'国旗+天安门城楼+朝霞，庄严又壮美' },
-    { name:'角楼', desc:'故宫角楼+日出', lat:39.9143,lng:116.3950, type:'sunrise',tag:'国风经典',detail:'东北角楼+筒子河倒影+朝霞，摄影教科书级构图' },
-    { name:'国家大剧院', desc:'巨蛋水面倒影+日落', lat:39.9033,lng:116.3833, type:'sunset',tag:'建筑倒影',detail:'大剧院弧形穹顶+水面倒影+落日晚霞，现代建筑与自然光的完美结合，蓝调时刻更绝' },
-    { name:'玉渊潭公园', desc:'电视塔倒影+日落', lat:39.9072,lng:116.3094, type:'sunset',tag:'水面倒影',detail:'八一湖朝西拍中央电视塔+湖面倒影+日落，樱花季更是双重经典' },
-    { name:'故宫午门', desc:'午门广场+日落', lat:39.9147,lng:116.3975, type:'sunset',tag:'经典机位',detail:'午门广场朝西拍，红墙金瓦+日落余晖，庄严大气的故宫日落构图' },
-    { name:'首钢园', desc:'冬奥大跳台+工业风日落', lat:39.9092,lng:116.1700, type:'sunset',tag:'工业风',detail:'首钢大跳台+冷却塔+炼钢炉+日落，冬奥遗产与工业遗迹的碰撞' },
-    { name:'天坛祈年殿', desc:'祈年殿+日落金辉', lat:39.8822,lng:116.4066, type:'sunset',tag:'古典建筑',detail:'祈年殿朝西拍，蓝色琉璃瓦在落日金光下极为壮观，古建+天空的经典构图' },
-    { name:'鼓楼', desc:'中轴线+胡同日落剪影', lat:39.9400,lng:116.3930, type:'sunset',tag:'城市剪影',detail:'鼓楼朝西拍，落日穿过老城胡同+车流剪影，北京味最浓的日落机位' },
-    { name:'朝阳公园', desc:'湖面CBD天际线日落', lat:39.9370,lng:116.4830, type:'sunset',tag:'城市倒影',detail:'朝阳公园湖面朝西拍，国贸CBD天际线倒影+日落水面金光，城市与自然融合' },
-    { name:'东交民巷', desc:'西洋建筑+日落余晖', lat:39.9030,lng:116.4100, type:'sunset',tag:'历史建筑',detail:'东交民巷西洋使馆建筑群+落日暖光，异国风情与北京历史的交汇' },
-    { name:'中山公园', desc:'社稷坛+古柏日落', lat:39.9096,lng:116.3930, type:'sunset',tag:'古典园林',detail:'社稷坛+千年古柏+落日余晖，紧邻故宫的静谧日落机位' },
-    { name:'圆明园福海', desc:'湖面+远山日落', lat:40.0080,lng:116.2980, type:'sunset',tag:'皇家园林',detail:'福海朝西拍，宽阔湖面+西山落日+荷花前景，规模宏大的皇家日落' },
-    { name:'香山香炉峰', desc:'西山之巅俯瞰日落', lat:39.9900,lng:116.1800, type:'sunset',tag:'山顶全景',detail:'香炉峰顶朝西拍，西山层峦+北京城轮廓+落日，秋季红叶+日落更是绝配' },
-    { name:'故宫角楼(西北)', desc:'故宫角楼+日落西山', lat:39.9166,lng:116.3890, type:'sunset',tag:'国风经典',detail:'西北角楼+筒子河倒影+西山落日，与东北角楼日出对应，日落时分光线打在角楼上' },
-    { name:'永定门城楼', desc:'中轴线南端日落', lat:39.8735,lng:116.3940, type:'both',tag:'中轴线',detail:'永定门城楼+南中轴线+日落/日出，视野开阔，人少景美的京城南门机位' },
+    { name:'景山公园', desc:'俯瞰故宫+日落西山', lat:39.9235,lng:116.3972, type:'sunset',tag:'经典机位',fee:'2元',hours:'6:00-20:30',detail:'万春亭朝西拍，故宫中轴线+远山日落，火烧云绝配' },
+    { name:'颐和园', desc:'昆明湖+西山日落', lat:39.9999,lng:116.2755, type:'sunset',tag:'水面倒影',fee:'30元',hours:'6:30-18:00',detail:'十七孔桥朝西，西山+昆明湖+晚霞倒影，金光穿洞奇观' },
+    { name:'北海公园', desc:'白塔+日落', lat:39.9243,lng:116.3897, type:'sunset',tag:'经典机位',fee:'10元',hours:'6:30-20:00',detail:'白塔+琼岛+晚霞，经典北京名片构图' },
+    { name:'奥森仰山', desc:'城中高点俯拍', lat:40.0170,lng:116.3935, type:'sunset',tag:'全景',fee:'免费',hours:'6:00-21:00',detail:'仰山山顶朝西，奥林匹克塔+西山+鸟巢全景日落' },
+    { name:'鬼笑石', desc:'北京城夜景全景', lat:39.9708,lng:116.1955, type:'sunset',tag:'夜景圣地',fee:'免费(西山森林公园)',hours:'全天（夜间可进）',detail:'西山俯瞰全城日落→蓝调→夜景，火烧云+万家灯火连拍' },
+    { name:'国贸CBD', desc:'天际线日落', lat:39.9087,lng:116.4606, type:'sunset',tag:'城市天际线',fee:'免费（公共区域）',hours:'全天',detail:'国贸三期/中央电视台周边，CBD摩天楼+晚霞剪影' },
+    { name:'什刹海后海', desc:'水面+胡同日落', lat:39.9416,lng:116.3849, type:'sunset',tag:'胡同风情',fee:'免费',hours:'全天',detail:'银锭桥向西拍，水面倒影+柳树剪影+西山落日经典' },
+    { name:'中央电视塔', desc:'高空360°全景', lat:39.9160,lng:116.3067, type:'both',tag:'高空机位',fee:'90元',hours:'8:30-22:00',detail:'238m高空观景台，朝西落日晚霞+朝东CBD夜景' },
+    { name:'雁栖湖', desc:'远山湖水+日落', lat:40.3686,lng:116.6758, type:'sunset',tag:'远郊秘境',fee:'45元',hours:'8:00-17:30',detail:'雁栖塔+APEC建筑群+水面+远山日落，构图层次丰富' },
+    { name:'卢沟桥-永定河', desc:'古桥+水面日落', lat:39.8600,lng:116.2150, type:'sunset',tag:'古桥韵味',fee:'20元',hours:'7:00-19:00',detail:'卢沟桥狮子剪影+永定河倒影+落日入河' },
+    { name:'天安门广场', desc:'国旗+城楼日出', lat:39.9054,lng:116.3976, type:'sunrise',tag:'经典日出',fee:'免费（需预约）',hours:'5:00-22:00',detail:'国旗+天安门城楼+朝霞，庄严又壮美' },
+    { name:'角楼', desc:'故宫角楼+日出', lat:39.9143,lng:116.3950, type:'sunrise',tag:'国风经典',fee:'免费（筒子河沿岸）',hours:'全天',detail:'东北角楼+筒子河倒影+朝霞，摄影教科书级构图' },
+    { name:'国家大剧院', desc:'巨蛋水面倒影+日落', lat:39.9033,lng:116.3833, type:'sunset',tag:'建筑倒影',fee:'外部免费',hours:'全天（外部）',detail:'大剧院弧形穹顶+水面倒影+落日晚霞，现代建筑与自然光的完美结合，蓝调时刻更绝' },
+    { name:'玉渊潭公园', desc:'电视塔倒影+日落', lat:39.9072,lng:116.3094, type:'sunset',tag:'水面倒影',fee:'2元',hours:'6:00-20:30',detail:'八一湖朝西拍中央电视塔+湖面倒影+日落，樱花季更是双重经典' },
+    { name:'故宫午门', desc:'午门广场+日落', lat:39.9147,lng:116.3975, type:'sunset',tag:'经典机位',fee:'60元（故宫门票）',hours:'8:30-17:00',detail:'午门广场朝西拍，红墙金瓦+日落余晖，庄严大气的故宫日落构图' },
+    { name:'首钢园', desc:'冬奥大跳台+工业风日落', lat:39.9092,lng:116.1700, type:'sunset',tag:'工业风',fee:'免费',hours:'全天开放',detail:'首钢大跳台+冷却塔+炼钢炉+日落，冬奥遗产与工业遗迹的碰撞' },
+    { name:'天坛祈年殿', desc:'祈年殿+日落金辉', lat:39.8822,lng:116.4066, type:'sunset',tag:'古典建筑',fee:'15元（祈年殿）',hours:'6:00-21:00',detail:'祈年殿朝西拍，蓝色琉璃瓦在落日金光下极为壮观，古建+天空的经典构图' },
+    { name:'鼓楼', desc:'中轴线+胡同日落剪影', lat:39.9400,lng:116.3930, type:'sunset',tag:'城市剪影',fee:'免费（外部）',hours:'全天（外部可拍）',detail:'鼓楼朝西拍，落日穿过老城胡同+车流剪影，北京味最浓的日落机位' },
+    { name:'朝阳公园', desc:'湖面CBD天际线日落', lat:39.9370,lng:116.4830, type:'sunset',tag:'城市倒影',fee:'免费',hours:'6:00-21:00',detail:'朝阳公园湖面朝西拍，国贸CBD天际线倒影+日落水面金光，城市与自然融合' },
+    { name:'东交民巷', desc:'西洋建筑+日落余晖', lat:39.9030,lng:116.4100, type:'sunset',tag:'历史建筑',fee:'免费（街道）',hours:'全天',detail:'东交民巷西洋使馆建筑群+落日暖光，异国风情与北京历史的交汇' },
+    { name:'中山公园', desc:'社稷坛+古柏日落', lat:39.9096,lng:116.3930, type:'sunset',tag:'古典园林',fee:'3元',hours:'6:00-20:00',detail:'社稷坛+千年古柏+落日余晖，紧邻故宫的静谧日落机位' },
+    { name:'圆明园福海', desc:'湖面+远山日落', lat:40.0080,lng:116.2980, type:'sunset',tag:'皇家园林',fee:'10元',hours:'7:00-19:00',detail:'福海朝西拍，宽阔湖面+西山落日+荷花前景，规模宏大的皇家日落' },
+    { name:'香山香炉峰', desc:'西山之巅俯瞰日落', lat:39.9900,lng:116.1800, type:'sunset',tag:'山顶全景',fee:'10元',hours:'6:00-18:00',detail:'香炉峰顶朝西拍，西山层峦+北京城轮廓+落日，秋季红叶+日落更是绝配' },
+    { name:'故宫角楼(西北)', desc:'故宫角楼+日落西山', lat:39.9166,lng:116.3890, type:'sunset',tag:'国风经典',fee:'免费（筒子河沿岸）',hours:'全天',detail:'西北角楼+筒子河倒影+西山落日，与东北角楼日出对应，日落时分光线打在角楼上' },
+    { name:'永定门城楼', desc:'中轴线南端日落', lat:39.8735,lng:116.3940, type:'both',tag:'中轴线',fee:'免费（外部）',hours:'全天',detail:'永定门城楼+南中轴线+日落/日出，视野开阔，人少景美的京城南门机位' },
   ],
   'shanghai': [
     { name:'外滩观景台', desc:'万国建筑+陆家嘴日落',lat:31.2400,lng:121.4900,type:'sunset',tag:'经典机位',detail:'外滩朝东拍陆家嘴日落(夏季)&朝西拍外滩华灯初上' },
@@ -2185,11 +2185,17 @@ function spotCardHtml(s) {
   const distLabel = s.distance < 1 ? `${Math.round(s.distance*1000)}m` : `${s.distance.toFixed(1)}km`;
   const typeIcon = s.type === 'sunrise' ? '🌅' : s.type === 'sunset' ? '🌇' : '🌄';
   const searchQ = encodeURIComponent(`北京 ${s.name} 日落 摄影`);
+  const feeIcon = s.fee && s.fee.includes('免费') ? '🆓' : '🎫';
+  const hoursStr = s.hours ? `🕐 ${s.hours}` : '';
   return `<div style="background:rgba(255,255,255,.04);border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:all .2s" onclick="toggleSpotDetail(this)" ontouchstart="">
     <div style="font-size:.72rem;font-weight:600;margin-bottom:2px">${s.name} <span style="font-weight:400;color:rgba(255,200,80,.6);font-size:.6rem">${s.tag||''}</span></div>
     <div style="font-size:.62rem;color:rgba(255,255,255,.5);margin-bottom:3px">${s.desc}</div>
     <div style="font-size:.55rem;color:rgba(255,255,255,.3)">${s.direction} · ${distLabel} · ${typeIcon}</div>
     <div class="spot-detail" style="display:none;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:.6rem;color:rgba(255,255,255,.5);line-height:1.6">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+        <span style="background:rgba(255,255,255,.05);border-radius:4px;padding:2px 6px">${feeIcon} ${s.fee||'--'}</span>
+        ${hoursStr ? `<span style="background:rgba(255,255,255,.05);border-radius:4px;padding:2px 6px">${hoursStr}</span>` : ''}
+      </div>
       ${s.detail}
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
         <a href="https://www.bing.com/images/search?q=${searchQ}" target="_blank" rel="noopener" style="background:rgba(255,200,80,.1);border:1px solid rgba(255,200,80,.2);border-radius:6px;padding:4px 10px;color:#fcd87a;font-size:.6rem;text-decoration:none;display:inline-flex;align-items:center;gap:3px">🔍 Bing搜图</a>
