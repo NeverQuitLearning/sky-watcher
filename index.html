@@ -1845,6 +1845,12 @@ const CITY_ALIASES = {
   '成都':'chengdu','成都市':'chengdu','chengdu':'chengdu','cd':'chengdu',
 };
 
+// 城市中文名映射（用于搜图、小红书搜索）
+const CITY_NAMES = {
+  beijing:'北京',shanghai:'上海',guangzhou:'广州',
+  shenzhen:'深圳',hangzhou:'杭州',chengdu:'成都',
+};
+
 // 获取当前城市ID
 function getCityId(cityName, lat, lng) {
   if (cityName) {
@@ -2061,7 +2067,7 @@ function renderNearbyResults(spots, sort) {
       '</div>' +
       '<div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px;margin-top:2px">' +
         '<span style="font-size:.58rem;background:' + lc + '20;color:' + lc + ';padding:1px 6px;border-radius:4px;font-weight:600">' + level + '</span>' +
-        (s.lat && s.lng ? '<a href="https://uri.amap.com/navigation?to=' + s.lng + ',' + s.lat + ',' + encodeURIComponent(s.name+' '+s.desc) + '&mode=car&coordinate=gaode" target="_blank" rel="noopener" style="font-size:.5rem;color:#4d96ff;text-decoration:none;background:rgba(77,150,255,.1);border-radius:4px;padding:1px 5px">🗺️导航</a>' : '') +
+        (s.lat && s.lng ? '<a href="amapuri://route/plan/?dlat='+s.lat+'&dlon='+s.lng+'&dname='+encodeURIComponent(s.name)+'&dev=0&t=0" onclick="event.stopPropagation()" style="font-size:.5rem;color:#4d96ff;text-decoration:none;background:rgba(77,150,255,.1);border-radius:4px;padding:1px 5px">🗺️导航</a>' : '') +
       '</div></div>';
   });
   if (spots.length > 15) html += '<div style="text-align:center;font-size:.6rem;color:rgba(255,255,255,.2);padding:4px 0">还有' + (spots.length-15) + '个地点…</div>';
@@ -2124,6 +2130,8 @@ function renderSpots() {
 
   // 排序：距离近的在前
   const cityShowName = cityName || (cityId ? cityId.charAt(0).toUpperCase() + cityId.slice(1) : '');
+  // 搜索用的中文城市名
+  const searchCity = CITY_NAMES[cityId] || cityShowName;
 
   let html = '';
   const displayCount = filteredSpots.length;
@@ -2148,7 +2156,7 @@ function renderSpots() {
   let spotsHtml = html;
   if (filteredSpots.length > 0) {
     spotsHtml += '<div class="photo-guide-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">';
-    filteredSpots.forEach(s => { spotsHtml += spotCardHtml(s); });
+    filteredSpots.forEach(s => { spotsHtml += spotCardHtml(s, searchCity); });
     spotsHtml += '</div>';
   }
   document.getElementById('spotsContent').innerHTML = spotsHtml;
@@ -2172,7 +2180,7 @@ function renderSpots() {
         newHtml += '<div style="text-align:center;padding:16px;font-size:.72rem;color:rgba(255,255,255,.25);line-height:1.6">📍 附近15km内没有适合此类型的机位</div>';
       } else {
         newHtml += '<div class="photo-guide-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">';
-        inRange.forEach(s => { newHtml += spotCardHtml(s); });
+        inRange.forEach(s => { newHtml += spotCardHtml(s, searchCity); });
         newHtml += '</div>';
       }
       document.getElementById('spotsContent').innerHTML = newHtml;
@@ -2182,19 +2190,26 @@ function renderSpots() {
 }
 
 // ========== 机位卡片 HTML 生成 & 展开/收起 ==========
-function spotCardHtml(s) {
+function spotCardHtml(s, searchCity) {
   const distLabel = s.distance < 1 ? `${Math.round(s.distance*1000)}m` : `${s.distance.toFixed(1)}km`;
   const typeIcon = s.type === 'sunrise' ? '🌅' : s.type === 'sunset' ? '🌇' : '🌄';
-  const searchQ = encodeURIComponent(`北京 ${s.name} 日落 摄影`);
+  const city = searchCity || '北京';
+  // Bing搜图：用实际城市名搜索该机位的摄影作品
+  const bingQ = encodeURIComponent(`${city} ${s.name} 摄影`);
+  // 小红书：用"拍照 机位"更精准
+  const xhsQ = encodeURIComponent(`${city} ${s.name} 拍照`);
   const feeIcon = s.fee && s.fee.includes('免费') ? '🆓' : '🎫';
   const hoursStr = s.hours ? `🕐 ${s.hours}` : '';
-  const navUrl = `https://uri.amap.com/navigation?to=${s.lng},${s.lat},${encodeURIComponent(s.name+' '+s.desc)}&mode=car&coordinate=gaode`;
+  // 高德地图APP深度链接（amapuri:// 协议直接唤起APP）
+  const navUrl = `amapuri://route/plan/?dlat=${s.lat}&dlon=${s.lng}&dname=${encodeURIComponent(s.name)}&dev=0&t=0`;
+  // 高德网页版回退链接
+  const navWebUrl = `https://uri.amap.com/navigation?to=${s.lng},${s.lat},${encodeURIComponent(s.name+' '+s.desc)}&mode=car&coordinate=gaode`;
   return `<div style="background:rgba(255,255,255,.04);border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,.06);cursor:pointer;transition:all .2s" onclick="toggleSpotDetail(this)" ontouchstart="">
     <div style="font-size:.72rem;font-weight:600;margin-bottom:2px">${s.name} <span style="font-weight:400;color:rgba(255,200,80,.6);font-size:.6rem">${s.tag||''}</span></div>
     <div style="font-size:.62rem;color:rgba(255,255,255,.5);margin-bottom:3px">${s.desc}</div>
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:.55rem;color:rgba(255,255,255,.3)">${s.direction} · ${distLabel} · ${typeIcon}</div>
-      <a href="${navUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="background:rgba(77,150,255,.15);border:1px solid rgba(77,150,255,.25);border-radius:6px;padding:2px 8px;color:#4d96ff;font-size:.55rem;text-decoration:none;display:inline-flex;align-items:center;gap:2px">🗺️ 导航</a>
+      <a href="${navUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation();tryGaode('${s.name}','${s.lat}','${s.lng}','${encodeURIComponent(s.name+' '+s.desc)}');return false" style="background:rgba(77,150,255,.15);border:1px solid rgba(77,150,255,.25);border-radius:6px;padding:2px 8px;color:#4d96ff;font-size:.55rem;text-decoration:none;display:inline-flex;align-items:center;gap:2px">🗺️ 导航</a>
     </div>
     <div class="spot-detail" style="display:none;margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:.6rem;color:rgba(255,255,255,.5);line-height:1.6">
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
@@ -2203,8 +2218,8 @@ function spotCardHtml(s) {
       </div>
       ${s.detail}
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-        <a href="https://www.bing.com/images/search?q=${searchQ}" target="_blank" rel="noopener" style="background:rgba(255,200,80,.1);border:1px solid rgba(255,200,80,.2);border-radius:6px;padding:4px 10px;color:#fcd87a;font-size:.6rem;text-decoration:none;display:inline-flex;align-items:center;gap:3px">🔍 Bing搜图</a>
-        <a href="https://www.xiaohongshu.com/search_result?keyword=${searchQ}" target="_blank" rel="noopener" style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.2);border-radius:6px;padding:4px 10px;color:#ff6b6b;font-size:.6rem;text-decoration:none;display:inline-flex;align-items:center;gap:3px">📕 小红书</a>
+        <a href="https://www.bing.com/images/search?q=${bingQ}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="background:rgba(255,200,80,.1);border:1px solid rgba(255,200,80,.2);border-radius:6px;padding:4px 10px;color:#fcd87a;font-size:.6rem;text-decoration:none;display:inline-flex;align-items:center;gap:3px">🔍 Bing搜图</a>
+        <a href="intent://search/notes?keyword=${xhsQ}#Intent;scheme=xhsdiscover;package=com.xingin.xhs;S.browser_fallback_url=https://www.xiaohongshu.com/explore?q=${xhsQ};end" onclick="event.stopPropagation()" style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.2);border-radius:6px;padding:4px 10px;color:#ff6b6b;font-size:.6rem;text-decoration:none;display:inline-flex;align-items:center;gap:3px">📕 小红书</a>
         <span style="font-size:.5rem;color:rgba(255,255,255,.2);align-self:center">点击收起</span>
       </div>
     </div>
@@ -2217,6 +2232,18 @@ function toggleSpotDetail(el) {
     const isHidden = detail.style.display === 'none' || !detail.style.display;
     detail.style.display = isHidden ? 'block' : 'none';
   }
+}
+
+// 高德导航：优先尝试APP深度链接，失败则回退网页版
+function tryGaode(name, lat, lng, desc) {
+  const appUrl = `amapuri://route/plan/?dlat=${lat}&dlon=${lng}&dname=${encodeURIComponent(name)}&dev=0&t=0`;
+  const webUrl = `https://uri.amap.com/navigation?to=${lng},${lat},${desc}&mode=car&coordinate=gaode`;
+  // 优先APP深度链接
+  window.location.href = appUrl;
+  // 500ms后如果APP没响应，跳转网页版
+  setTimeout(function() {
+    window.open(webUrl, '_blank');
+  }, 500);
 }
 
 
