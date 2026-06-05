@@ -2130,10 +2130,28 @@ function renderSpots() {
     html += '</div>';
   }
 
+  // 渲染机位列表
+  let spotsHtml = html;
+
+  // 渲染每个机位卡片
+  if (filteredSpots.length > 0) {
+    const showSpots = filteredSpots.slice(0, 8); // 最多8个
+    spotsHtml += '<div class="photo-guide-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">';
+    showSpots.forEach(s => {
+      const distLabel = s.distance < 1 ? `${Math.round(s.distance*1000)}m` : `${s.distance.toFixed(1)}km`;
+      spotsHtml += '<div style="background:rgba(255,255,255,.04);border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,.06)">';
+      spotsHtml += `<div style="font-size:.72rem;font-weight:600;margin-bottom:2px">${s.name} <span style="font-weight:400;color:rgba(255,200,80,.6);font-size:.6rem">${s.tag||''}</span></div>`;
+      spotsHtml += `<div style="font-size:.62rem;color:rgba(255,255,255,.5);margin-bottom:3px">${s.desc}</div>`;
+      spotsHtml += `<div style="font-size:.55rem;color:rgba(255,255,255,.3)">${s.direction} · ${distLabel} · ${s.type === 'sunrise' ? '🌅' : s.type === 'sunset' ? '🌇' : '🌄'}</div>`;
+      spotsHtml += '</div>';
+    });
+    spotsHtml += '</div>';
+  }
+
+  document.getElementById('spotsContent').innerHTML = spotsHtml;
+
   // 当前时段智能推荐
   let idealSpots = filteredSpots;
-
-
 
   // 筛选按钮事件
   document.querySelectorAll('.spot-filter').forEach(btn => {
@@ -2143,19 +2161,30 @@ function renderSpots() {
         b.style.background = 'rgba(255,255,255,.06)';
         b.style.color = 'rgba(255,255,255,.4)';
       });
-      if (filter === 'all') {
-        idealSpots = spots;
-        this.style.background = 'rgba(255,200,80,.15)';
-        this.style.color = '#fcd87a';
-        this.style.fontWeight = '600';
+      this.style.background = 'rgba(255,200,80,.15)';
+      this.style.color = '#fcd87a';
+      this.style.fontWeight = '600';
+
+      // 重新渲染筛选后的机位
+      const filtered = filter === 'all' ? spots : spots.filter(s => s.type === filter || s.type === 'both');
+      const inRange = filtered.filter(s => s.distance <= 15);
+      let newHtml = html;
+      if (inRange.length === 0) {
+        newHtml += '<div style="text-align:center;padding:16px;font-size:.72rem;color:rgba(255,255,255,.25);line-height:1.6">📍 附近15km内没有适合此类型的机位</div>';
       } else {
-        idealSpots = spots.filter(s => s.type === filter || s.type === 'both');
-        this.style.background = 'rgba(255,200,80,.15)';
-        this.style.color = '#fcd87a';
-        this.style.fontWeight = '600';
+        const show = inRange.slice(0, 8);
+        newHtml += '<div class="photo-guide-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">';
+        show.forEach(s => {
+          const distLabel = s.distance < 1 ? `${Math.round(s.distance*1000)}m` : `${s.distance.toFixed(1)}km`;
+          newHtml += '<div style="background:rgba(255,255,255,.04);border-radius:10px;padding:8px;border:1px solid rgba(255,255,255,.06)">';
+          newHtml += `<div style="font-size:.72rem;font-weight:600;margin-bottom:2px">${s.name} <span style="font-weight:400;color:rgba(255,200,80,.6);font-size:.6rem">${s.tag||''}</span></div>`;
+          newHtml += `<div style="font-size:.62rem;color:rgba(255,255,255,.5);margin-bottom:3px">${s.desc}</div>`;
+          newHtml += `<div style="font-size:.55rem;color:rgba(255,255,255,.3)">${s.direction} · ${distLabel} · ${s.type === 'sunrise' ? '🌅' : s.type === 'sunset' ? '🌇' : '🌄'}</div>`;
+          newHtml += '</div>';
+        });
+        newHtml += '</div>';
       }
-      // Re-render spots with new filter (simple approach: refilter spotsContent)
-      // For simplicity, we scroll to the card
+      document.getElementById('spotsContent').innerHTML = newHtml;
       document.getElementById('spotsCard').scrollIntoView({ behavior: 'smooth' });
     });
   });

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>筹码分布分析</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0f1923; color: #e0e0e0; padding: 16px;
+}
+.header { text-align: center; padding: 12px 0; border-bottom: 1px solid #1a2a3a; margin-bottom: 16px; }
+.header h1 { font-size: 18px; color: #00c853; }
+.header p { font-size: 12px; color: #8899aa; }
+.card {
+    background: #13202e; border-radius: 10px; padding: 16px;
+    margin-bottom: 16px; border: 1px solid #1e2e3e;
+}
+.card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+}
+.card-title { font-size: 16px; font-weight: bold; color: #fff; }
+.card-sub { font-size: 12px; color: #6688aa; }
+.price-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.price-item { text-align: center; min-width: 70px; }
+.price-item .label { font-size: 11px; color: #8899aa; }
+.price-item .value { font-size: 18px; font-weight: bold; }
+.price-item .value.up { color: #ff5252; }
+.price-item .value.down { color: #4caf50; }
+.price-item .value.neutral { color: #ffa726; }
+.chip-container { position: relative; height: 320px; margin: 10px 0; }
+.chip-chart { position: relative; height: 300px; }
+.y-axis { position: absolute; left: 0; top: 0; bottom: 30px; width: 50px; 
+           display: flex; flex-direction: column; justify-content: space-between;
+           font-size: 10px; color: #6688aa; }
+.bars-area { position: absolute; left: 55px; right: 10px; top: 0; bottom: 30px; }
+.bar-row { position: absolute; width: 100%; display: flex; align-items: center; }
+.bar-label { position: absolute; right: -65px; font-size: 10px; color: #8899aa; width: 60px; text-align: right; }
+.bar-fill { height: 100%; border-radius: 2px; position: relative; min-width: 2px; }
+.bar-fill.profit { background: linear-gradient(90deg, #4caf50, #66bb6a); }
+.bar-fill.loss { background: linear-gradient(90deg, #ef5350, #ff5252); }
+.bar-fill.buyline { background: #ffa726; }
+.bar-fill.current { background: #42a5f5; }
+.x-axis { position: absolute; left: 55px; right: 10px; bottom: 2px; height: 25px; }
+.current-line { position: absolute; border-top: 1px dashed #42a5f5; width: 100%; z-index: 5; }
+.buy-line { position: absolute; border-top: 1px dashed #ffa726; width: 100%; z-index: 5; }
+.conc-range { position: absolute; background: rgba(255,167,38,0.08); border: 1px solid rgba(255,167,38,0.2); border-radius: 4px; z-index: 1; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; margin-top: 10px; }
+.info-item { background: #0a1a28; padding: 8px 10px; border-radius: 6px; }
+.info-item .l { color: #8899aa; }
+.info-item .v { color: #e0e0e0; font-weight: bold; }
+.info-item .v.green { color: #4caf50; }
+.info-item .v.red { color: #ff5252; }
+.info-item .v.orange { color: #ffa726; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11px; color: #8899aa; margin-top: 8px; }
+.legend span { display: flex; align-items: center; gap: 4px; }
+.legend .dot { width: 12px; height: 3px; border-radius: 2px; display: inline-block; }
+.footer { text-align: center; font-size: 11px; color: #445566; padding: 10px; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>📊 筹码分布 · 成本分析</h1>
+    <p>2026年5月27日收盘后</p>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <span class="card-title">中国国航</span>
+            <span class="card-sub">601111</span>
+        </div>
+    </div>
+    
+    <div class="price-row">
+        <div class="price-item">
+            <div class="label">买入价</div>
+            <div class="value neutral">6.86</div>
+        </div>
+        <div class="price-item">
+            <div class="label">现价</div>
+            <div class="value red">6.86</div>
+        </div>
+        <div class="price-item">
+            <div class="label">持仓盈亏</div>
+            <div class="value red">+0.00%</div>
+        </div>
+        <div class="price-item">
+            <div class="label">平均成本</div>
+            <div class="value">7.79</div>
+        </div>
+        <div class="price-item">
+            <div class="label">获利比例</div>
+            <div class="value red">16.9%</div>
+        </div>
+    </div>
+    
+    <div class="chip-container" style="position:relative;height:340px;">
+        <div class="x-axis" style="position:absolute;left:10px;right:10px;bottom:0;font-size:10px;color:#445566;text-align:center;">
+            ← 筹码量 →
+        </div>
+        <!-- Chart area -->
+        <div style="position:absolute;left:10px;right:90px;top:5px;bottom:25px;">
+            <!-- 70% concentration range -->
+            <div style="position:absolute;bottom:2.9315960912052077%;height:6.188925081433238%;left:0;right:0;
+                background:rgba(255,167,38,0.06);border:1px solid rgba(255,167,38,0.15);border-radius:3px;
+                display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,167,38,0.4);">
+                70%筹码区间 6.47-6.66
+            </div>
+            <!-- Current price line -->
+            <div style="position:absolute;bottom:15.63517915309448%;left:0;right:0;border-top:1.5px dashed #42a5f5;z-index:5;"></div>
+            <!-- Buy price line -->
+            <div style="position:absolute;bottom:15.63517915309448%;left:0;right:0;border-top:1.5px dashed #ffa726;z-index:5;"></div>
+            <!-- Bars -->
+            <div style="position:absolute;top:0.0%;height:2.0%;left:95.68%;width:4.32%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:0.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">6.41</div><div style="position:absolute;top:2.0%;height:2.0%;left:95.68%;width:4.32%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:4.0%;height:2.0%;left:91.464%;width:8.536%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:6.0%;height:2.0%;left:80.352%;width:19.648%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:8.0%;height:2.0%;left:64.328%;width:35.672000000000004%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:8.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">6.66</div><div style="position:absolute;top:10.0%;height:2.0%;left:62.064%;width:37.936%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:12.0%;height:2.0%;left:42.815999999999995%;width:57.184000000000005%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:14.000000000000002%;height:2.0%;left:24.616%;width:75.384%;display:flex;align-items:center;"><div class="bar-fill current" style="width:100%;"></div></div><div style="position:absolute;top:14.000000000000002%;right:-80px;font-size:10px;color:#ffa726;height:2.0%;display:flex;align-items:center;">6.84 (现价)</div><div style="position:absolute;top:16.0%;height:2.0%;left:20.0%;width:80.0%;display:flex;align-items:center;"><div class="bar-fill current" style="width:100%;"></div></div><div style="position:absolute;top:16.0%;right:-80px;font-size:10px;color:#ffa726;height:2.0%;display:flex;align-items:center;">6.9 (现价)</div><div style="position:absolute;top:18.0%;height:2.0%;left:20.935999999999993%;width:79.06400000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:20.0%;height:2.0%;left:29.159999999999997%;width:70.84%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:22.0%;height:2.0%;left:37.05599999999999%;width:62.94400000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:24.0%;height:2.0%;left:54.352%;width:45.648%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:24.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">7.15</div><div style="position:absolute;top:26.0%;height:2.0%;left:69.376%;width:30.624000000000002%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:28.000000000000004%;height:2.0%;left:74.232%;width:25.768%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:30.0%;height:2.0%;left:69.008%;width:30.992000000000004%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:32.0%;height:2.0%;left:71.728%;width:28.272000000000006%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:32.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">7.39</div><div style="position:absolute;top:34.0%;height:2.0%;left:87.736%;width:12.264000000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:36.0%;height:2.0%;left:91.344%;width:8.656%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:38.0%;height:2.0%;left:89.264%;width:10.736%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:40.0%;height:2.0%;left:91.888%;width:8.112%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:40.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">7.64</div><div style="position:absolute;top:42.0%;height:2.0%;left:93.68%;width:6.32%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:44.0%;height:2.0%;left:95.0%;width:5.0%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:46.0%;height:2.0%;left:91.232%;width:8.768%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:48.0%;height:2.0%;left:91.216%;width:8.784%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:48.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">7.88</div><div style="position:absolute;top:50.0%;height:2.0%;left:91.24%;width:8.76%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:52.0%;height:2.0%;left:81.136%;width:18.864%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:54.0%;height:2.0%;left:76.8%;width:23.200000000000003%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:56.00000000000001%;height:2.0%;left:78.48%;width:21.52%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:56.00000000000001%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">8.13</div><div style="position:absolute;top:57.99999999999999%;height:2.0%;left:75.584%;width:24.416%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:60.0%;height:2.0%;left:72.688%;width:27.312%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:62.0%;height:2.0%;left:67.22399999999999%;width:32.776%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:64.0%;height:2.0%;left:64.19999999999999%;width:35.800000000000004%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:64.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">8.38</div><div style="position:absolute;top:66.0%;height:2.0%;left:67.104%;width:32.896%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:68.0%;height:2.0%;left:71.056%;width:28.944000000000003%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:70.0%;height:2.0%;left:62.872%;width:37.128%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:72.0%;height:2.0%;left:62.48%;width:37.52%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:72.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">8.62</div><div style="position:absolute;top:74.0%;height:2.0%;left:59.224%;width:40.776%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:76.0%;height:2.0%;left:68.288%;width:31.712000000000003%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:78.0%;height:2.0%;left:66.576%;width:33.424%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:80.0%;height:2.0%;left:65.056%;width:34.944%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:80.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">8.87</div><div style="position:absolute;top:82.0%;height:2.0%;left:65.0%;width:35.0%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:84.0%;height:2.0%;left:56.367999999999995%;width:43.632000000000005%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:86.0%;height:2.0%;left:61.424%;width:38.576%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:88.0%;height:2.0%;left:67.304%;width:32.696%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:88.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">9.11</div><div style="position:absolute;top:90.0%;height:2.0%;left:78.944%;width:21.056%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:92.0%;height:2.0%;left:84.32%;width:15.680000000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:94.0%;height:2.0%;left:88.976%;width:11.024000000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:96.0%;height:2.0%;left:94.168%;width:5.832000000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:96.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">9.36</div><div style="position:absolute;top:98.0%;height:2.0%;left:98%;width:2%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div>
+        </div>
+    </div>
+    
+    <div class="legend">
+        <span><span class="dot" style="background:#4caf50;"></span> 获利筹码</span>
+        <span><span class="dot" style="background:#ef5350;"></span> 套牢筹码</span>
+        <span><span class="dot" style="background:#42a5f5;"></span> 当前价格</span>
+        <span><span class="dot" style="background:#ffa726;"></span> 你的买入价</span>
+        <span><span class="dot" style="background:rgba(255,167,38,0.2);border:1px solid rgba(255,167,38,0.3);"></span> 70%筹码密集区</span>
+    </div>
+    
+    <div class="info-grid">
+        <div class="info-item">
+            <div class="l">持仓盈亏</div>
+            <div class="v red">+0.00%</div>
+        </div>
+        <div class="info-item">
+            <div class="l">市场平均成本</div>
+            <div class="v">7.79</div>
+        </div>
+        <div class="info-item">
+            <div class="l">你 vs 市场</div>
+            <div class="v red">低于市场 11.9%</div>
+        </div>
+        <div class="info-item">
+            <div class="l">70%筹码区间</div>
+            <div class="v orange">6.47 - 6.66</div>
+        </div>
+        <div class="info-item">
+            <div class="l">全区间</div>
+            <div class="v">6.38 - 9.45</div>
+        </div>
+        <div class="info-item">
+            <div class="l">获利筹码占比</div>
+            <div class="v red">16.9%</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <span class="card-title">中国铝业</span>
+            <span class="card-sub">601600</span>
+        </div>
+    </div>
+    
+    <div class="price-row">
+        <div class="price-item">
+            <div class="label">买入价</div>
+            <div class="value neutral">11.83</div>
+        </div>
+        <div class="price-item">
+            <div class="label">现价</div>
+            <div class="value red">12.09</div>
+        </div>
+        <div class="price-item">
+            <div class="label">持仓盈亏</div>
+            <div class="value red">+2.20%</div>
+        </div>
+        <div class="price-item">
+            <div class="label">平均成本</div>
+            <div class="value">12.59</div>
+        </div>
+        <div class="price-item">
+            <div class="label">获利比例</div>
+            <div class="value red">41.0%</div>
+        </div>
+    </div>
+    
+    <div class="chip-container" style="position:relative;height:340px;">
+        <div class="x-axis" style="position:absolute;left:10px;right:10px;bottom:0;font-size:10px;color:#445566;text-align:center;">
+            ← 筹码量 →
+        </div>
+        <!-- Chart area -->
+        <div style="position:absolute;left:10px;right:90px;top:5px;bottom:25px;">
+            <!-- 70% concentration range -->
+            <div style="position:absolute;bottom:2.951388888888888%;height:3.993055555555562%;left:0;right:0;
+                background:rgba(255,167,38,0.06);border:1px solid rgba(255,167,38,0.15);border-radius:3px;
+                display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,167,38,0.4);">
+                70%筹码区间 10.26-10.49
+            </div>
+            <!-- Current price line -->
+            <div style="position:absolute;bottom:34.72222222222222%;left:0;right:0;border-top:1.5px dashed #42a5f5;z-index:5;"></div>
+            <!-- Buy price line -->
+            <div style="position:absolute;bottom:30.208333333333336%;left:0;right:0;border-top:1.5px dashed #ffa726;z-index:5;"></div>
+            <!-- Bars -->
+            <div style="position:absolute;top:0.0%;height:2.0%;left:96.608%;width:3.3920000000000003%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:0.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">10.15</div><div style="position:absolute;top:2.0%;height:2.0%;left:92.70400000000001%;width:7.295999999999999%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:4.0%;height:2.0%;left:79.03999999999999%;width:20.96%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:6.0%;height:2.0%;left:46.744%;width:53.256%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:8.0%;height:2.0%;left:31.903999999999996%;width:68.096%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:8.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">10.61</div><div style="position:absolute;top:10.0%;height:2.0%;left:53.983999999999995%;width:46.016000000000005%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:12.0%;height:2.0%;left:59.367999999999995%;width:40.632000000000005%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:14.000000000000002%;height:2.0%;left:46.072%;width:53.928%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:16.0%;height:2.0%;left:43.623999999999995%;width:56.376000000000005%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:16.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">11.07</div><div style="position:absolute;top:18.0%;height:2.0%;left:46.279999999999994%;width:53.720000000000006%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:20.0%;height:2.0%;left:52.232%;width:47.768%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:22.0%;height:2.0%;left:58.16%;width:41.84%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:24.0%;height:2.0%;left:57.024%;width:42.976%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:24.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">11.53</div><div style="position:absolute;top:26.0%;height:2.0%;left:39.488%;width:60.512%;display:flex;align-items:center;"><div class="bar-fill profit" style="width:100%;"></div></div><div style="position:absolute;top:28.000000000000004%;height:2.0%;left:24.927999999999997%;width:75.072%;display:flex;align-items:center;"><div class="bar-fill buyline" style="width:100%;"></div></div><div style="position:absolute;top:28.000000000000004%;right:-80px;font-size:10px;color:#ffa726;height:2.0%;display:flex;align-items:center;">11.76 (买入)</div><div style="position:absolute;top:30.0%;height:2.0%;left:20.0%;width:80.0%;display:flex;align-items:center;"><div class="bar-fill buyline" style="width:100%;"></div></div><div style="position:absolute;top:30.0%;right:-80px;font-size:10px;color:#ffa726;height:2.0%;display:flex;align-items:center;">11.88 (买入)</div><div style="position:absolute;top:32.0%;height:2.0%;left:32.64%;width:67.36%;display:flex;align-items:center;"><div class="bar-fill current" style="width:100%;"></div></div><div style="position:absolute;top:32.0%;right:-80px;font-size:10px;color:#42a5f5;height:2.0%;display:flex;align-items:center;">11.99 (现价)</div><div style="position:absolute;top:34.0%;height:2.0%;left:44.944%;width:55.056%;display:flex;align-items:center;"><div class="bar-fill current" style="width:100%;"></div></div><div style="position:absolute;top:34.0%;right:-80px;font-size:10px;color:#42a5f5;height:2.0%;display:flex;align-items:center;">12.11 (现价)</div><div style="position:absolute;top:36.0%;height:2.0%;left:65.632%;width:34.368%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:38.0%;height:2.0%;left:71.328%;width:28.672000000000004%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:40.0%;height:2.0%;left:72.224%;width:27.776%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:40.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">12.45</div><div style="position:absolute;top:42.0%;height:2.0%;left:65.488%;width:34.512%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:44.0%;height:2.0%;left:60.63999999999999%;width:39.36000000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:46.0%;height:2.0%;left:65.6%;width:34.4%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:48.0%;height:2.0%;left:63.495999999999995%;width:36.504000000000005%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:48.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">12.91</div><div style="position:absolute;top:50.0%;height:2.0%;left:53.583999999999996%;width:46.416000000000004%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:52.0%;height:2.0%;left:39.50399999999999%;width:60.49600000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:54.0%;height:2.0%;left:35.056%;width:64.944%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:56.00000000000001%;height:2.0%;left:24.575999999999993%;width:75.424%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:56.00000000000001%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">13.37</div><div style="position:absolute;top:57.99999999999999%;height:2.0%;left:31.688000000000002%;width:68.312%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:60.0%;height:2.0%;left:37.52799999999999%;width:62.47200000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:62.0%;height:2.0%;left:31.927999999999997%;width:68.072%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:64.0%;height:2.0%;left:37.839999999999996%;width:62.160000000000004%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:64.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">13.83</div><div style="position:absolute;top:66.0%;height:2.0%;left:44.10399999999999%;width:55.89600000000001%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:68.0%;height:2.0%;left:46.135999999999996%;width:53.864000000000004%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:70.0%;height:2.0%;left:46.16%;width:53.84%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:72.0%;height:2.0%;left:54.168%;width:45.832%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:72.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">14.29</div><div style="position:absolute;top:74.0%;height:2.0%;left:64.776%;width:35.224000000000004%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:76.0%;height:2.0%;left:72.0%;width:28.0%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:78.0%;height:2.0%;left:77.24%;width:22.76%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:80.0%;height:2.0%;left:77.72%;width:22.28%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:80.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">14.76</div><div style="position:absolute;top:82.0%;height:2.0%;left:81.08%;width:18.919999999999998%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:84.0%;height:2.0%;left:87.136%;width:12.863999999999999%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:86.0%;height:2.0%;left:92.104%;width:7.896%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:88.0%;height:2.0%;left:94.728%;width:5.272%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:88.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">15.22</div><div style="position:absolute;top:90.0%;height:2.0%;left:96.184%;width:3.816%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:92.0%;height:2.0%;left:96.184%;width:3.816%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:94.0%;height:2.0%;left:96.184%;width:3.816%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:96.0%;height:2.0%;left:96.184%;width:3.816%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div><div style="position:absolute;top:96.0%;right:-80px;font-size:10px;color:#6688aa;height:2.0%;display:flex;align-items:center;">15.68</div><div style="position:absolute;top:98.0%;height:2.0%;left:96.184%;width:3.816%;display:flex;align-items:center;"><div class="bar-fill loss" style="width:100%;"></div></div>
+        </div>
+    </div>
+    
+    <div class="legend">
+        <span><span class="dot" style="background:#4caf50;"></span> 获利筹码</span>
+        <span><span class="dot" style="background:#ef5350;"></span> 套牢筹码</span>
+        <span><span class="dot" style="background:#42a5f5;"></span> 当前价格</span>
+        <span><span class="dot" style="background:#ffa726;"></span> 你的买入价</span>
+        <span><span class="dot" style="background:rgba(255,167,38,0.2);border:1px solid rgba(255,167,38,0.3);"></span> 70%筹码密集区</span>
+    </div>
+    
+    <div class="info-grid">
+        <div class="info-item">
+            <div class="l">持仓盈亏</div>
+            <div class="v red">+2.20%</div>
+        </div>
+        <div class="info-item">
+            <div class="l">市场平均成本</div>
+            <div class="v">12.59</div>
+        </div>
+        <div class="info-item">
+            <div class="l">你 vs 市场</div>
+            <div class="v red">低于市场 6.0%</div>
+        </div>
+        <div class="info-item">
+            <div class="l">70%筹码区间</div>
+            <div class="v orange">10.26 - 10.49</div>
+        </div>
+        <div class="info-item">
+            <div class="l">全区间</div>
+            <div class="v">10.09 - 15.85</div>
+        </div>
+        <div class="info-item">
+            <div class="l">获利筹码占比</div>
+            <div class="v red">41.0%</div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    ⚠️ 筹码分布基于近120个交易日成交数据估算，仅供参考<br>
+    数据来源: 腾讯证券 | 2026-05-27
+</div>
+</body>
+</html>
