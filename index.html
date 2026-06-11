@@ -982,6 +982,19 @@ async function fetchSupplementaryCaiyun(key) {
     const rt = data.result?.realtime;
     if (!rt) return null;
 
+    // 保存逐小时预报数据到 state（用于火烧云预测）
+    const hourly = data.result?.hourly;
+    if (hourly) {
+      state.caiyunHourly = {
+        cloudrate: hourly.cloudrate || [],
+        skycon: hourly.skycon || [],
+        visibility: hourly.visibility || [],
+        humidity: hourly.humidity || [],
+        temperature: hourly.temperature || [],
+        wind: hourly.wind || [],
+      };
+    }
+
     return {
       cloud: rt.cloudrate != null ? Math.round(rt.cloudrate * 100) : 50,
       humidity: rt.humidity != null ? Math.round(rt.humidity * 100) : 50,
@@ -1614,10 +1627,160 @@ function renderFireCloud() {
     return { score, tier, tierLabel, tierColor, badgeClass, cloud, humidity, vis, precip, cloudDesc };
   }
 
-  // ---------- 计算各时段 ----------
-  const evening = calcFireCloud(sunsetIdx);
-  const morning = calcFireCloud(tomorrowSunriseIdx >= 0 ? tomorrowSunriseIdx : sunriseIdx);
-  const current = calcFireCloud(nowIdx);
+  // ---------- 彩云数据火烧云算法（优先使用） ----------
+  function calcFireCloudCaiyun(targetHour) {
+    if (!state.caiyunHourly || !state.caiyunHourly.cloudrate.length) return null;
+
+    // 找到目标时间前后各2小时的数据窗口
+    const windowHours = [-2, -1, 0, 1, 2]; // 目标时间前后各2小时
+    const dataPoints = [];
+
+    for (const offset of windowHours) {
+      const targetTime = new Date();
+      targetTime.setHours(Math.floor(targetHour) + offset, (targetHour % 1) * 60, 0, 0);
+      const targetISO = targetTime.toISOString().slice(0, 16); // "2026-06-11T18:00"
+
+      // 查找对应时间的数据
+      const cloudItem = state.caiyunHourly.cloudrate.find(item =>
+        item.datetime && item.datetime.startsWith(targetISO.slice(0, 13))
+      );
+      const skyconItem = state.caiyunHourly.skycon.find(item =>
+        item.datetime && item.datetime.startsWith(targetISO.slice(0, 13))
+      );
+      const visItem = state.caiyunHourly.visibility.find(item =>
+        item.datetime && item.datetime.startsWith(targetISO.slice(0, 13))
+      );
+      const humItem = state.caiyunHourly.humidity.find(item =>
+        item.datetime && item.datetime.startsWith(targetISO.slice(0, 13))
+      );
+      const windItem = state.caiyunHourly.wind.find(item =>
+        item.datetime && item.datetime.startsWith(targetISO.slice(0, 13))
+      );
+
+      if (cloudItem && skyconItem) {
+        dataPoints.push({
+          cloud: cloudItem.value * 100, // 转换为百分比
+          skycon: skyconItem.value,
+          visibility: visItem ? visItem.value : 15,
+          humidity: humItem ? humItem.value * 100 : 50,
+          wind: windItem ? windItem.value : { speed: 0, direction: 0 },
+        });
+      }
+    }
+
+    if (dataPoints.length === 0) return null;
+
+    // 对窗口内每个数据点分别评分，然后综合加权
+    let totalScore = 0;
+    let weights = [0.1, 0.25, 0.3, 0.25, 0.1]; // 中间时间点权重更高
+
+    for (let i = 0; i < dataPoints.length; i++) {
+      const dp = dataPoints[i];
+      const weight = weights[i] || 0.2;
+
+      // 云量因子（权重0.40）
+      let cloudFactor;
+      if (dp.cloud >= 20 && dp.cloud <= 60) {
+        cloudFactor = 1 - Math.abs(dp.cloud - 40) / 35;
+      } else if (dp.cloud < 20) {
+        cloudFactor = (dp.cloud / 20) * 0.4;
+      } else if (dp.cloud <= 80) {
+        cloudFactor = Math.max(0.3, 1 - (dp.cloud - 60) / 20);
+      } else {
+        cloudFactor = 0.2;
+      }
+
+      // 天气因子（权重0.25）
+      const SKYCON_SCORES = {
+        'PARTLY_CLOUDY': 1.0,
+        'CLEAR_DAY': 0.3,
+        'CLEAR_NIGHT': 0.3,
+        'CLOUDY': 0.5,
+        'OVERCAST': 0.3,
+        'LIGHT_RAIN': 0.0,
+        'HEAVY_RAIN': 0.0,
+        'RAIN': 0.0,
+        'SNOW': 0.1,
+        'LIGHT_SNOW': 0.1,
+        'HEAVY_SNOW': 0.1,
+        'FOG': 0.0,
+        'HAZE': 0.2,
+      };
+      const skyFactor = SKYCON_SCORES[dp.skycon] || 0.3;
+
+      // 能见度因子（权重0.20）
+      let visFactor;
+      if (dp.visibility > 15) visFactor = 1.0;
+      else if (dp.visibility >= 8) visFactor = 0.6 + (dp.visibility - 8) / 7 * 0.4;
+      else visFactor = 0.3;
+
+      // 湿度因子（权重0.10）
+      let humFactor;
+      if (dp.humidity >= 35 && dp.humidity <= 70) {
+        humFactor = 1 - Math.abs(dp.humidity - 52) / 30;
+      } else if (dp.humidity < 35) {
+        humFactor = (dp.humidity / 35) * 0.5;
+      } else {
+        humFactor = Math.max(0, 1 - (dp.humidity - 70) / 30);
+      }
+
+      // 风向因子（权重0.05）
+      let windFactor = 0.5; // 默认中性
+      if (dp.wind && dp.wind.direction != null) {
+        const dir = dp.wind.direction;
+        // 西南风(180-270)最佳，带来水汽；北风(330-30)干燥不利
+        if (dir >= 180 && dir <= 270) windFactor = 0.8 + (1 - Math.abs(dir - 225) / 45) * 0.2;
+        else if (dir >= 150 && dir < 180) windFactor = 0.6;
+        else if (dir > 270 && dir <= 300) windFactor = 0.6;
+        else if (dir >= 330 || dir <= 30) windFactor = 0.2;
+        else windFactor = 0.4;
+      }
+
+      // 综合评分
+      const pointScore = (cloudFactor * 0.40 + skyFactor * 0.25 + visFactor * 0.20 + humFactor * 0.10 + windFactor * 0.05) * 100;
+      totalScore += pointScore * weight;
+    }
+
+    const score = Math.round(Math.min(100, Math.max(0, totalScore)));
+    const tier = score >= 70 ? 'da' : score >= 50 ? 'zhong' : score >= 25 ? 'xiao' : 'none';
+    const tierLabel = score >= 70 ? '🔥 大烧' : score >= 50 ? '🔥 中烧' : score >= 25 ? '🔥 小烧' : '❌ 无';
+    const tierColor = score >= 70 ? '#ff4444' : score >= 50 ? '#ff6b35' : score >= 25 ? '#ffa94d' : '#999';
+    const badgeClass = score >= 70 ? 'badge-great' : score >= 50 ? 'badge-good' : score >= 25 ? 'badge-fair' : 'badge-poor';
+
+    // 取目标时刻的数据用于显示
+    const targetDP = dataPoints[Math.floor(dataPoints.length / 2)] || dataPoints[0];
+    const cloud = Math.round(targetDP.cloud);
+    const humidity = Math.round(targetDP.humidity);
+    const vis = targetDP.visibility;
+    const precip = 0; // 彩云数据中没有降水概率，设为0
+
+    let cloudDesc;
+    if (cloud < 10) cloudDesc = '晴天无云 ☀️';
+    else if (cloud < 25) cloudDesc = '少云 🌤';
+    else if (cloud < 40) cloudDesc = '疏云 有戏 ☁️';
+    else if (cloud < 55) cloudDesc = '多云 最佳条件！☁️☁️';
+    else if (cloud < 70) cloudDesc = '多云偏阴 🌥';
+    else cloudDesc = '阴天云量偏多 ☁️☁️☁️';
+
+    // 计算可信度（基于数据点数量）
+    const confidence = dataPoints.length >= 4 ? 'high' : dataPoints.length >= 2 ? 'medium' : 'low';
+
+    return { score, tier, tierLabel, tierColor, badgeClass, cloud, humidity, vis, precip, cloudDesc, confidence, source: 'caiyun' };
+  }
+
+  // ---------- 计算各时段（优先使用彩云数据） ----------
+  let evening = calcFireCloudCaiyun(sunsetH);
+  let morning = calcFireCloudCaiyun(tomorrowSunriseIdx >= 0 ? sunriseH + 24 : sunriseH);
+  let current = calcFireCloudCaiyun(h);
+  let dataSource = 'caiyun';
+
+  // 如果彩云数据不可用，fallback 到 Open-Meteo
+  if (!evening) {
+    evening = calcFireCloud(sunsetIdx);
+    dataSource = 'openmeteo';
+  }
+  if (!morning) morning = calcFireCloud(tomorrowSunriseIdx >= 0 ? tomorrowSunriseIdx : sunriseIdx);
+  if (!current) current = calcFireCloud(nowIdx);
 
   // ---------- 趋势分析（当前 vs 日落时段） ----------
   let trend = null; // 'improving' | 'stable' | 'worsening'
@@ -1701,6 +1864,49 @@ function renderFireCloud() {
     const c = 2 * Math.PI * 24, off = c * (1 - evening.score / 100);
     const visText = evening.vis > 12000 ? '通透' : evening.vis > 7000 ? '一般' : '雾霾';
     const humLbl = evening.humidity > 60 ? '偏湿' : evening.humidity < 35 ? '偏干' : '适宜';
+
+    // 数据源徽章
+    const sourceBadge = dataSource === 'caiyun'
+      ? '<span style="font-size:.55rem;background:rgba(107,203,119,.15);color:#6bcb77;padding:2px 6px;border-radius:4px;margin-left:6px">📡 彩云天气</span>'
+      : '<span style="font-size:.55rem;background:rgba(255,217,61,.15);color:#ffd93d;padding:2px 6px;border-radius:4px;margin-left:6px">📡 Open-Meteo</span>';
+
+    // 可信度指示
+    const confidenceIcon = evening.confidence === 'high' ? '🟢' : evening.confidence === 'medium' ? '🟡' : '🔴';
+    const confidenceText = evening.confidence === 'high' ? '高' : evening.confidence === 'medium' ? '中' : '低';
+
+    // 云量趋势图（如果有彩云数据）
+    let cloudTrendHTML = '';
+    if (state.caiyunHourly && state.caiyunHourly.cloudrate.length > 0) {
+      const trendHours = [-2, -1, 0, 1, 2];
+      const trendData = trendHours.map(offset => {
+        const targetTime = new Date();
+        targetTime.setHours(Math.floor(sunsetH) + offset, (sunsetH % 1) * 60, 0, 0);
+        const targetISO = targetTime.toISOString().slice(0, 13);
+        const item = state.caiyunHourly.cloudrate.find(item =>
+          item.datetime && item.datetime.startsWith(targetISO)
+        );
+        return item ? Math.round(item.value * 100) : null;
+      }).filter(v => v !== null);
+
+      if (trendData.length >= 3) {
+        const maxCloud = Math.max(...trendData);
+        cloudTrendHTML = '<div style="margin-top:8px;padding:6px 8px;background:rgba(255,255,255,.03);border-radius:8px">' +
+          '<div style="font-size:.6rem;color:rgba(255,255,255,.4);margin-bottom:4px">📊 云量趋势 (日落前后)</div>' +
+          '<div style="display:flex;align-items:flex-end;gap:3px;height:40px;justify-content:center">';
+        trendData.forEach((cloud, i) => {
+          const height = Math.max(4, cloud * 0.4);
+          const isTarget = i === Math.floor(trendData.length / 2);
+          const bgColor = isTarget ? 'rgba(255,200,80,.6)' : 'rgba(255,255,255,.15)';
+          cloudTrendHTML += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">' +
+            '<div style="font-size:.5rem;color:rgba(255,255,255,.5)">' + cloud + '%</div>' +
+            '<div style="width:16px;height:' + height + 'px;background:' + bgColor + ';border-radius:2px"></div>' +
+            '<div style="font-size:.45rem;color:rgba(255,255,255,.3)">' + (trendHours[i] > 0 ? '+' : '') + trendHours[i] + 'h</div>' +
+          '</div>';
+        });
+        cloudTrendHTML += '</div></div>';
+      }
+    }
+
     html += '<div style="padding:2px 0">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
         '<div style="position:relative;width:56px;height:56px;flex-shrink:0">' +
@@ -1710,8 +1916,9 @@ function renderFireCloud() {
           '</svg>' +
           '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">' +
             '<div style="font-size:.85rem;font-weight:700;color:' + evening.tierColor + '">' + evening.score + '</div></div></div>' +
-        '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:600">🌇 今晚晚霞 (' + formatTime(sunsetH) + ')</div>' +
-        '<span class="badge ' + evening.badgeClass + '" style="display:inline-block">' + evening.tierLabel + '</span></div>' +
+        '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:600">🌇 今晚晚霞 (' + formatTime(sunsetH) + ')' + sourceBadge + '</div>' +
+        '<span class="badge ' + evening.badgeClass + '" style="display:inline-block">' + evening.tierLabel + '</span>' +
+        '<span style="font-size:.6rem;color:rgba(255,255,255,.4);margin-left:6px">' + confidenceIcon + ' 可信度:' + confidenceText + '</span></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.65rem">' +
         '<div style="background:rgba(255,255,255,.04);border-radius:6px;padding:4px 6px;text-align:center"><div style="color:rgba(255,255,255,.4);font-size:.55rem">☁️ 云量</div><div style="font-weight:600;margin-top:1px">' + evening.cloud + '%</div><div style="font-size:.5rem;color:rgba(255,255,255,.35)">' + evening.cloudDesc + '</div></div>' +
@@ -1719,6 +1926,7 @@ function renderFireCloud() {
         '<div style="background:rgba(255,255,255,.04);border-radius:6px;padding:4px 6px;text-align:center"><div style="color:rgba(255,255,255,.4);font-size:.55rem">👁 能见度</div><div style="font-weight:600;margin-top:1px">' + (evening.vis/1000).toFixed(1) + 'km</div><div style="font-size:.5rem;color:rgba(255,255,255,.35)">' + visText + '</div></div>' +
         '<div style="background:rgba(255,255,255,.04);border-radius:6px;padding:4px 6px;text-align:center"><div style="color:rgba(255,255,255,.4);font-size:.55rem">🌧 降雨</div><div style="font-weight:600;margin-top:1px">' + evening.precip + '%</div><div style="font-size:.5rem;color:rgba(255,255,255,.35)">' + (evening.precip < 30 ? '影响小' : '有影响') + '</div></div>' +
       '</div>' +
+      cloudTrendHTML +
       (evening.tier !== 'none' ? '<div style="margin-top:8px;font-size:.75rem;color:rgba(255,255,255,.5);text-align:center;line-height:1.6">' +
         (evening.score >= 70 ? '🔥 <strong style="color:#ff6b35">条件极佳！</strong>中高层云+湿度适宜，大概率出现壮观火烧云！' : '') +
         (evening.score >= 50 && evening.score < 70 ? '🔥 <strong style="color:#ffa94d">条件不错。</strong>有望看到不错的火烧云，值得期待！' : '') +
@@ -3014,6 +3222,30 @@ setInterval(() => {
   updateSkyBg();
   renderAlerts();
 }, 60000);
+
+// ======== 火烧云自动刷新（日落前3小时内每10分钟刷新） ========
+let _fireCloudRefreshTimer = null;
+function startFireCloudAutoRefresh() {
+  if (_fireCloudRefreshTimer) return;
+  _fireCloudRefreshTimer = setInterval(async () => {
+    if (!state.sun || !state.sun.sunset) return;
+    const now = new Date();
+    const h = now.getHours() + now.getMinutes() / 60;
+    const sunsetH = state.sun.sunset;
+    // 距离日落<3小时且日落还没过
+    if (sunsetH - h > 0 && sunsetH - h < 3) {
+      const keys = getApiKeys();
+      if (keys.caiyun && state.lat && state.lng) {
+        try {
+          await fetchSupplementaryCaiyun(keys.caiyun);
+          renderFireCloud();
+        } catch(e) { /* silent */ }
+      }
+    }
+  }, 10 * 60 * 1000); // 每10分钟
+}
+// 页面加载后启动
+setTimeout(startFireCloudAutoRefresh, 5000);
 
 
 
